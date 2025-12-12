@@ -55,11 +55,11 @@ FetchContent_MakeAvailable(ftxui)
 FetchContent_MakeAvailable(tomlplusplus)
 FetchContent_MakeAvailable(cpp-httplib)
 
+target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE lib/curl/lib)
+
 target_link_libraries(
   ${CMAKE_PROJECT_NAME} PRIVATE ftxui::component ftxui::dom ftxui::screen
-                                tomlplusplus::tomlplusplus)
+                                tomlplusplus::tomlplusplus curl)
 
-target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
-    lib/json
-    lib/cpp-httplib
-)
+target_include_directories(${CMAKE_PROJECT_NAME}
+                           PRIVATE lib/json lib/cpp-httplib lib/curl)
