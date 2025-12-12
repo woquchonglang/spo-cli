@@ -11,10 +11,8 @@ Config::Config() {
   // std::cout << tbl << "\n";
 
   client_id = config["client_id"].value_or(""sv);
+  client_secret = config["client_secret"].value_or(""sv);
   login_redirect_url = config["login_redirect_url"].value_or(""sv);
-
-  std::cout << client_id << std::endl;
-  std::cout << login_redirect_url << std::endl;
 }
 
 Config::~Config() {}
