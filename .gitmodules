@@ -1,0 +1,15 @@
+[submodule "lib/tomlplusplus"]
+	path = lib/tomlplusplus
+	url = https://github.com/marzer/tomlplusplus.git
+[submodule "lib/ftxui"]
+	path = lib/ftxui
+	url = https://github.com/ArthurSonzogni/FTXUI.git
+[submodule "lib/sdbus-cpp"]
+	path = lib/sdbus-cpp
+	url = https://github.com/Kistler-Group/sdbus-cpp.git
+[submodule "lib/cpp-httplib"]
+	path = lib/cpp-httplib
+	url = https://github.com/yhirose/cpp-httplib.git
+[submodule "lib/CPPify"]
+	path = lib/CPPify
+	url = https://github.com/KielanT/CPPify.git
