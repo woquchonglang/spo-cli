@@ -1,0 +1,53 @@
+name: CI
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  CI:
+    permissions:
+      contents: read
+      pull-requests: write
+    runs-on: ubuntu-latest
+    container:
+        image: archlinux
+    steps:
+      - name: Get required pacman pkgs
+        shell: bash
+        run: |
+          sed -i 's/SigLevel = Required DatabaseOptional/SigLevel = Optional TrustAll/' /etc/pacman.conf
+          pacman --noconfirm --noprogressbar -Syyu
+          pacman --noconfirm --noprogressbar -Sy \
+            git \
+            diffutils \
+            cmake \
+            ninja \
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 50
+
+      - name: Cmake
+        run: cmake -B build -G Ninja
+
+      - name: clang-format
+        id: clang-format 
+        shell: bash {0}
+        run: |
+          FILES=$(git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }}...HEAD -- '*.cpp' '*.hpp' '*.c' '*.h'")
+          if [ -z "$FILES" ]; then
+            echo "No files to check"
+            exit 0
+          fi
+          clang-format --dry-run --Werror --style=file $FILES
+
+      - name: Add PR comment
+        if: (failure() && (steps.clang-format.outcome == 'failure' && github.event_name == 'pull_request'))
+        uses: mshick/add-pr-comment@v2
+        with:
+          message: |
+            ## ⚠️ code style check failed
+            ### Clang-Format error
+            please run `clang-format -i <file>` to fix error
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          refresh-message-position: true
