@@ -1,13 +1,15 @@
-#include "client/client.hpp"
-#include "config/config.hpp"
-#include "ui/ui.hpp"
+
+import config;
+import spotifyAuth;
+import spotifyWebAPI;
+import std;
 
 int main() {
-  Config config;
+    Config config;
 
-  Client client(config);
-  client.login();
+    SpotifyAuth auth(config);
+    auth.login();
 
-  // Ui ui;
-  // ui.render();
+    SpotifyWebAPI api(auth.getAccessToken());
+    api.getProfile();
 }

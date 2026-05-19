@@ -4,6 +4,6 @@
 
 class DefaultConfig {
 public:
-  DefaultConfig();
-  ~DefaultConfig();
+    DefaultConfig();
+    ~DefaultConfig();
 };
