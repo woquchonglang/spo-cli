@@ -1,65 +1,63 @@
-cmake_minimum_required(VERSION 3.24)
+cmake_minimum_required(VERSION 4.3)
+
+set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD 451f2fe2-a8a2-47c3-bc32-94786d8fc91b)
 
 set(CMAKE_PROJECT_NAME spo-cli)
 
 project(${CMAKE_PROJECT_NAME})
 
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g3")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -g3")
+set(CMAKE_BUILD_TYPE "Debug")
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# linker
+find_program(MOLD_PROGRAM mold)
+if (MOLD_PROGRAM)
+    add_link_options(-fuse-ld=mold)
+else ()
+    message(STATUS "mold not found")
+endif ()
 
 add_executable(${CMAKE_PROJECT_NAME})
 
-file(GLOB_RECURSE SRCFILES "src/*.cpp")
-target_sources(${CMAKE_PROJECT_NAME} PRIVATE ${SRCFILES})
-
 # lib
+
+find_program(CCACHE_PROGRAM ccache)
+
+if(CCACHE_PROGRAM)
+  set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
+  set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
+endif()
+
 include(FetchContent)
 set(FETCHCONTENT_QUIET OFF)
 
-FetchContent_Declare(
-  CPPify
-  GIT_REPOSITORY https://github.com/KielanT/CPPify.git
-  GIT_TAG main
-  GIT_SHALLOW TRUE
-  GIT_PROGRESS TRUE
-  SOURCE_DIR "${CMAKE_SOURCE_DIR}/lib/CPPify")
+set(FTXUI_BUILD_MODULES ON)
+set(TOMLPLUSPLUS_BUILD_MODULES ON)
+set(HTTPLIB_BUILD_MODULES ON)
+set(HTTPLIB_COMPILE ON)
+set(NLOHMANN_JSON_BUILD_MODULES ON CACHE BOOL "Enable nlohmann.json module support")
 
-FetchContent_Declare(
-  ftxui
-  GIT_REPOSITORY https://github.com/ArthurSonzogni/ftxui
-  GIT_TAG v6.1.9
-  GIT_SHALLOW TRUE
-  GIT_PROGRESS TRUE
-  SOURCE_DIR "${CMAKE_SOURCE_DIR}/lib/ftxui")
-
-FetchContent_Declare(
-  tomlplusplus
-  GIT_REPOSITORY https://github.com/marzer/tomlplusplus.git
-  GIT_TAG v3.4.0
-  GIT_SHALLOW TRUE
-  GIT_PROGRESS TRUE
-  SOURCE_DIR "${CMAKE_SOURCE_DIR}/lib/tomlplusplus")
-
-FetchContent_Declare(
-  cpp-httplib
-  GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
-  GIT_TAG v0.28.0
-  GIT_SHALLOW TRUE
-  GIT_PROGRESS TRUE
-  SOURCE_DIR "${CMAKE_SOURCE_DIR}/lib/cpp-httplib")
-
-FetchContent_MakeAvailable(CPPify)
-FetchContent_MakeAvailable(ftxui)
-FetchContent_MakeAvailable(tomlplusplus)
-FetchContent_MakeAvailable(cpp-httplib)
-
-target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE lib/curl/lib)
+add_subdirectory(lib/nlohmann-json)
+add_subdirectory(lib/tomlplusplus)
+add_subdirectory(lib/sdbus-cpp)
+add_subdirectory(lib/ftxui)
+add_subdirectory(lib/cpp-httplib)
 
 target_link_libraries(
-  ${CMAKE_PROJECT_NAME} PRIVATE ftxui::component ftxui::dom ftxui::screen
-                                tomlplusplus::tomlplusplus curl)
+  ${CMAKE_PROJECT_NAME} PRIVATE ftxui::modules SDBusCpp::sdbus-c++ nlohmann_json_modules httplib
+                                 tomlplusplus_modules curl ssl crypto)
 
-target_include_directories(${CMAKE_PROJECT_NAME}
-                           PRIVATE lib/json lib/cpp-httplib lib/curl)
+file(GLOB_RECURSE SRCFILES "src/*.cpp")
+file(GLOB_RECURSE MODULE_FILES "src/*.cppm")
+
+target_sources(${CMAKE_PROJECT_NAME}
+  PUBLIC FILE_SET CXX_MODULES FILES ${MODULE_FILES}
+  PUBLIC ${SRCFILES}
+)
+
+set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES CXX_MODULE_STD ON)
