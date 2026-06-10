@@ -8,6 +8,7 @@ import config;
 import nlohmann.json;
 import httplib;
 import std;
+import timer;
 
 export class SpotifyAuth {
 public:
@@ -16,7 +17,8 @@ public:
     std::string getAccessToken() const { return access_token; }
 
 private:
-    std::string exchangeCodeForToken(const std::string &code);
+    void exchangeCodeForToken(const std::string &code);
+    void refreshAccessToken();
 
 private:
     const Config &config;
@@ -29,8 +31,9 @@ static std::string generateRandomString(size_t length);
 
 SpotifyAuth::SpotifyAuth(const Config &config) : config(config) {}
 
-std::string SpotifyAuth::exchangeCodeForToken(const std::string &code) {
+void SpotifyAuth::exchangeCodeForToken(const std::string &code) {
     httplib::Client client("https://accounts.spotify.com");
+    client.set_address_family(AF_INET);
     std::string body = "code=" + httplib::encode_uri_component(code) +
                        "&redirect_uri=" + httplib::encode_uri_component(config.login_redirect_url) +
                        "&grant_type=authorization_code";
@@ -42,15 +45,8 @@ std::string SpotifyAuth::exchangeCodeForToken(const std::string &code) {
         this->access_token = response["access_token"];
         this->refresh_token = response["refresh_token"];
         this->expires_in = response["expires_in"];
-
-        std::print("Access Token: {}\n", access_token);
-        std::print("Refresh Token: {}\n", refresh_token);
-        std::print("expires_in: {}\n", expires_in);
-
-        return access_token;
     } else {
         std::cerr << "HTTP request failed, error code: " << static_cast<int>(res.error()) << std::endl;
-        return "";
     }
 }
 
@@ -76,8 +72,6 @@ void SpotifyAuth::login() {
                       << "state=" << state;
 
         res.set_redirect(_redirect_url.str());
-
-        std::print("Redirecting to Spotify login: {}\n", _redirect_url.str());
     });
 
     app.Get("/callback", [&](const httplib::Request &req, httplib::Response &res) {
@@ -90,14 +84,39 @@ void SpotifyAuth::login() {
             return;
         }
 
-        std::string token = exchangeCodeForToken(code);
+        exchangeCodeForToken(code);
+        Timer::instance().add_task_after(std::chrono::seconds(expires_in), [this]() { refreshAccessToken(); });
 
         res.set_content("Successfully authenticated.", "text/plain");
-        app.stop();
+
+        if (app.is_running())
+            app.stop();
     });
 
     std::print("login to: http://127.0.0.1:8989/login\n");
+
+    system("xdg-open http://127.0.0.1:8989/login");
+
     app.listen("127.0.0.1", 8989);
+}
+
+void SpotifyAuth::refreshAccessToken() {
+    httplib::Client client("https://accounts.spotify.com");
+    client.set_address_family(AF_INET);
+    std::string body = "grant_type=refresh_token&refresh_token=" + refresh_token;
+    client.set_basic_auth(config.client_id, config.client_secret);
+    auto res = client.Post("/api/token", body, "application/x-www-form-urlencoded");
+
+    if (res && res->status == 200) {
+        nlohmann::json response = nlohmann::json::parse(res->body);
+        this->access_token = response["access_token"];
+        this->expires_in = response["expires_in"];
+        // sometimes Spotify may return a new refresh token, so we need to update it if it's present
+        this->refresh_token = response.value("refresh_token", this->refresh_token);
+        Timer::instance().add_task_after(std::chrono::seconds(expires_in), [this]() { refreshAccessToken(); });
+    } else {
+        std::cerr << "HTTP request failed, error code: " << static_cast<int>(res.error()) << std::endl;
+    }
 }
 
 // https://generate-random.org/strings/cpp
