@@ -16,3 +16,27 @@
 [submodule "lib/nlohmann-json"]
 	path = lib/nlohmann-json
 	url = https://github.com/nlohmann/json.git
+[submodule "lib/cava"]
+	path = lib/cava
+	url = https://github.com/karlstav/cava.git
+[submodule "lib/magic_enum"]
+	path = lib/magic_enum
+	url = https://github.com/Neargye/magic_enum.git
+[submodule "lib/miniaudio"]
+	path = lib/miniaudio
+	url = https://github.com/mackron/miniaudio.git
+[submodule "lib/concurrentqueue"]
+	path = lib/concurrentqueue
+	url = https://github.com/cameron314/concurrentqueue.git
+[submodule "lib/caches"]
+	path = lib/caches
+	url = https://github.com/vpetrigo/caches.git
+[submodule "lib/base64"]
+	path = lib/base64
+	url = https://github.com/tobiaslocker/base64.git
+[submodule "lib/stb"]
+	path = lib/stb
+	url = https://github.com/nothings/stb.git
+[submodule "lib/url"]
+	path = lib/url
+	url = https://github.com/glynos/url

@@ -41,16 +41,40 @@ set(TOMLPLUSPLUS_BUILD_MODULES ON)
 set(HTTPLIB_BUILD_MODULES ON)
 set(HTTPLIB_COMPILE ON)
 set(NLOHMANN_JSON_BUILD_MODULES ON CACHE BOOL "Enable nlohmann.json module support")
+set(MINIAUDIO_ENABLE_ALSA ON)
+set(BASE64_ENABLE_TESTING OFF)
+set(skyr_BUILD_TESTS OFF)
+set(skyr_ENABLE_JSON_FUNCTIONS OFF)
 
 add_subdirectory(lib/nlohmann-json)
 add_subdirectory(lib/tomlplusplus)
 add_subdirectory(lib/sdbus-cpp)
 add_subdirectory(lib/ftxui)
 add_subdirectory(lib/cpp-httplib)
+add_subdirectory(lib/miniaudio)
+add_subdirectory(lib/concurrentqueue)
+add_subdirectory(lib/url)
+add_subdirectory(lib/base64)
+
+add_library(caches INTERFACE)
+target_include_directories(caches INTERFACE lib/caches/include)
+
+add_library(stb INTERFACE)
+add_compile_definitions(STB_IMAGE_IMPLEMENTATION)
+
+target_include_directories(caches INTERFACE lib/stb)
+
+# concurrentqueue has so many static func and static value which can expose global module TU local
+target_compile_options(concurrentqueue INTERFACE -Wno-expose-global-module-tu-local)
+
+target_compile_options(skyr-url INTERFACE -Wno-deprecated-literal-operator -Wno-unused-result)
 
 target_link_libraries(
   ${CMAKE_PROJECT_NAME} PRIVATE ftxui::modules SDBusCpp::sdbus-c++ nlohmann_json_modules httplib
-                                 tomlplusplus_modules curl ssl crypto)
+                                 tomlplusplus_modules curl ssl crypto miniaudio concurrentqueue caches
+                                 skyr-url base64)
+
+# add_compile_options(-Wexpose-global-module-tu-local)
 
 file(GLOB_RECURSE SRCFILES "src/*.cpp")
 file(GLOB_RECURSE MODULE_FILES "src/*.cppm")
