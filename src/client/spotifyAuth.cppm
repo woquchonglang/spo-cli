@@ -10,19 +10,49 @@ import httplib;
 import std;
 import timer;
 
+std::vector<std::string> scopes = {
+    // Images
+    "ugc-image-upload",
+    // Spotify Connect
+    "user-read-playback-state",
+    "user-modify-playback-state",
+    "user-read-currently-playing",
+    // Playback
+    "app-remote-control",
+    "streaming",
+    // Playlists
+    "playlist-read-private",
+    "playlist-read-collaborative",
+    "playlist-modify-private",
+    "playlist-modify-public",
+    // Follow
+    "user-follow-modify",
+    "user-follow-read",
+    // Listening History
+    "user-read-playback-position",
+    "user-top-read",
+    "user-read-recently-played",
+    // Library
+    "user-library-modify",
+    "user-library-read",
+    // Users
+    "user-read-email",
+    "user-read-private",
+};
+
 export class SpotifyAuth {
 public:
     SpotifyAuth(const Config &config);
     void login();
-    std::string getAccessToken() const { return access_token; }
+    std::shared_ptr<std::string> getAccessToken() { return access_token; }
 
 private:
-    void exchangeCodeForToken(const std::string &code);
+    void exchangeCodeForToken(std::string_view code);
     void refreshAccessToken();
 
 private:
     const Config &config;
-    std::string access_token;
+    std::shared_ptr<std::string> access_token = std::make_shared<std::string>();
     std::string refresh_token;
     int expires_in;
 };
@@ -31,10 +61,10 @@ static std::string generateRandomString(size_t length);
 
 SpotifyAuth::SpotifyAuth(const Config &config) : config(config) {}
 
-void SpotifyAuth::exchangeCodeForToken(const std::string &code) {
+void SpotifyAuth::exchangeCodeForToken(std::string_view code) {
     httplib::Client client("https://accounts.spotify.com");
     client.set_address_family(AF_INET);
-    std::string body = "code=" + httplib::encode_uri_component(code) +
+    std::string body = "code=" + httplib::encode_uri_component(code.data()) +
                        "&redirect_uri=" + httplib::encode_uri_component(config.login_redirect_url) +
                        "&grant_type=authorization_code";
     client.set_basic_auth(config.client_id, config.client_secret);
@@ -42,7 +72,7 @@ void SpotifyAuth::exchangeCodeForToken(const std::string &code) {
 
     if (res && res->status == 200) {
         nlohmann::json response = nlohmann::json::parse(res->body);
-        this->access_token = response["access_token"];
+        *this->access_token = response["access_token"];
         this->refresh_token = response["refresh_token"];
         this->expires_in = response["expires_in"];
     } else {
@@ -61,7 +91,20 @@ void SpotifyAuth::login() {
 
     app.Get("/login", [&](const httplib::Request &, httplib::Response &res) {
         std::string state = generateRandomString(16);
-        std::string scope = "user-read-private user-read-email";
+
+        auto scopes_to_string = [](const std::vector<std::string> &scopes) {
+            std::string result;
+            for (size_t i = 0; i < scopes.size(); ++i) {
+                if (i != 0) {
+                    result += " ";
+                }
+                result += scopes[i];
+            }
+            return result;
+        };
+
+        // std::string scope = "user-read-private user-read-email user-top-read";
+        std::string scope = scopes_to_string(scopes);
 
         std::ostringstream _redirect_url;
         _redirect_url << "https://accounts.spotify.com/authorize?"
@@ -109,7 +152,7 @@ void SpotifyAuth::refreshAccessToken() {
 
     if (res && res->status == 200) {
         nlohmann::json response = nlohmann::json::parse(res->body);
-        this->access_token = response["access_token"];
+        *this->access_token = response["access_token"];
         this->expires_in = response["expires_in"];
         // sometimes Spotify may return a new refresh token, so we need to update it if it's present
         this->refresh_token = response.value("refresh_token", this->refresh_token);

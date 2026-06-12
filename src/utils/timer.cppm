@@ -12,6 +12,28 @@ struct Task {
 
 export class Timer : public Singleton<Timer> {
 public:
+    void stop() {
+        is_running = false;
+        cv_.notify_all();
+    }
+
+    void add_task(std::chrono::steady_clock::time_point time, std::function<void()> func) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        tasks.push_back({ time, func });
+        std::sort(tasks.begin(), tasks.end(), [](const Task &a, const Task &b) { return a.time < b.time; });
+        cv_.notify_all();
+    }
+
+    void add_task_after(std::chrono::milliseconds delay, std::function<void()> func) {
+        add_task(std::chrono::steady_clock::now() + delay, func);
+    }
+
+    ~Timer() { stop(); }
+
+private:
+    Timer() : is_running(false) { start(); }
+    friend class Singleton<Timer>;
+
     void start() {
         is_running = true;
         event_loop_thread = std::jthread([this]() {
@@ -33,27 +55,6 @@ public:
         });
     }
 
-    void stop() {
-        is_running = false;
-        cv_.notify_all();
-    }
-
-    void add_task(std::chrono::steady_clock::time_point time, std::function<void()> func) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        tasks.push_back({ time, func });
-        std::sort(tasks.begin(), tasks.end(), [](const Task &a, const Task &b) { return a.time < b.time; });
-        cv_.notify_all();
-    }
-
-    void add_task_after(std::chrono::milliseconds delay, std::function<void()> func) {
-        add_task(std::chrono::steady_clock::now() + delay, func);
-    }
-
-    ~Timer() { stop(); }
-
-private:
-    Timer() : is_running(false) {}
-    friend class Singleton<Timer>;
 
     std::atomic<bool> is_running;
     std::jthread event_loop_thread;
