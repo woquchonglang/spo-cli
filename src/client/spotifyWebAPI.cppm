@@ -10,8 +10,8 @@ import rwlock;
 
 struct Image {
     std::string url;
-    int height;
-    int width;
+    int height = 0;
+    int width = 0;
 };
 
 struct SizesImages {
@@ -43,10 +43,12 @@ struct UserTopTracksData {
 
 export struct SpotifyData {
     RwLock<std::optional<UserProfile>> userProfile;
-    RwLock<std::optional<UserTopArtistsData>> topArtists;
-    RwLock<std::optional<UserTopTracksData>> topTracks;
+    RwLock<UserTopArtistsData> topArtists;
+    RwLock<UserTopTracksData> topTracks;
 
-    SpotifyData() : userProfile(std::nullopt), topArtists(std::nullopt), topTracks(std::nullopt) {}
+    RwLock<bool> isLogined;
+
+    SpotifyData() : userProfile(std::nullopt), topArtists({}), topTracks({}),isLogined(false){}
 };
 
 export class SpotifyWebAPI {
@@ -54,10 +56,8 @@ public:
     SpotifyWebAPI(std::shared_ptr<std::string> accessToken);
 
     std::optional<UserProfile> getUserProfile();
-    std::optional<UserTopArtistsData> getUserTopArtists(const std::string &timeRange = "medium_term", int limit = 20,
-                                                        int offset = 0);
-    std::optional<UserTopTracksData> getUserTopTracks(const std::string &timeRange = "medium_term", int limit = 20,
-                                                      int offset = 0);
+    UserTopArtistsData getUserTopArtists(const std::string &timeRange = "medium_term", int limit = 20, int offset = 0);
+    UserTopTracksData getUserTopTracks(const std::string &timeRange = "medium_term", int limit = 20, int offset = 0);
     void getUserFollowPlaylist();
     void userUnfollowPlaylist();
     void getUserFollowedArtists();
@@ -109,8 +109,7 @@ std::optional<UserProfile> SpotifyWebAPI::getUserProfile() {
  *             Default: medium_term
  *
  */
-std::optional<UserTopArtistsData> SpotifyWebAPI::getUserTopArtists(const std::string &timeRange, int limit,
-                                                                   int offset) {
+UserTopArtistsData SpotifyWebAPI::getUserTopArtists(const std::string &timeRange, int limit, int offset) {
     httplib::Client client("https://api.spotify.com");
     client.set_address_family(AF_INET);
     // std::string url = "/v1/me/top/artists?time_range=" + timeRange + "&limit=" + std::to_string(limit) +
@@ -153,7 +152,7 @@ std::optional<UserTopArtistsData> SpotifyWebAPI::getUserTopArtists(const std::st
         return data;
     } else {
         std::cerr << "HTTP request failed, error code: " << static_cast<int>(res.error()) << std::endl;
-        return std::nullopt;
+        return {};
     }
 }
 
@@ -165,7 +164,7 @@ std::optional<UserTopArtistsData> SpotifyWebAPI::getUserTopArtists(const std::st
  *             Default: medium_term
  *
  */
-std::optional<UserTopTracksData> SpotifyWebAPI::getUserTopTracks(const std::string &timeRange, int limit, int offset) {
+UserTopTracksData SpotifyWebAPI::getUserTopTracks(const std::string &timeRange, int limit, int offset) {
     httplib::Client client("https://api.spotify.com");
     client.set_address_family(AF_INET);
     std::string url = "/v1/me/top/tracks?time_range=" + timeRange + "&limit=" + std::to_string(limit) +
@@ -185,6 +184,6 @@ std::optional<UserTopTracksData> SpotifyWebAPI::getUserTopTracks(const std::stri
         return data;
     } else {
         std::cerr << "HTTP request failed, error code: " << static_cast<int>(res.error()) << std::endl;
-        return std::nullopt;
+        return {};
     }
 }

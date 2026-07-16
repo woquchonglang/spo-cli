@@ -43,7 +43,7 @@ std::vector<std::string> scopes = {
 export class SpotifyAuth {
 public:
     SpotifyAuth(const Config &config);
-    void login();
+    bool login();
     std::shared_ptr<std::string> getAccessToken() { return access_token; }
 
 private:
@@ -83,8 +83,10 @@ void SpotifyAuth::exchangeCodeForToken(std::string_view code) {
 /*
  * https://developer.spotify.com/documentation/web-api/tutorials/code-flow
  */
-void SpotifyAuth::login() {
+bool SpotifyAuth::login() {
     httplib::Server app;
+
+    std::atomic<bool> auth_success{false};
 
     auto client_id = config.client_id;
     auto redirect_url = config.login_redirect_url;
@@ -134,13 +136,23 @@ void SpotifyAuth::login() {
 
         if (app.is_running())
             app.stop();
+
+    auth_success = true;
     });
 
-    std::print("login to: http://127.0.0.1:8989/login\n");
+    std::println("login to: http://127.0.0.1:8989/login");
 
     system("xdg-open http://127.0.0.1:8989/login");
 
     app.listen("127.0.0.1", 8989);
+
+    int wait_count = 0;
+    while (!auth_success && wait_count < 300) {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        wait_count++;
+    }
+
+    return auth_success;
 }
 
 void SpotifyAuth::refreshAccessToken() {
