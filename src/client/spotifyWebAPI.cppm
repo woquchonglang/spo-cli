@@ -51,13 +51,15 @@ export struct SpotifyData {
     SpotifyData() : userProfile({}), topArtists({}), topTracks({}), isLogined(false) {}
 };
 
+struct APIImpl;
+
 export class SpotifyWebAPI {
 public:
-    SpotifyWebAPI(std::shared_ptr<std::string> accessToken);
+    SpotifyWebAPI(std::shared_ptr<std::string> accessToken, std::shared_ptr<SpotifyData> data);
+    ~SpotifyWebAPI();
 
-    UserProfile getUserProfile();
-    UserTopArtistsData getUserTopArtists(const std::string &timeRange = "medium_term", int limit = 20, int offset = 0);
-    UserTopTracksData getUserTopTracks(const std::string &timeRange = "medium_term", int limit = 20, int offset = 0);
+    void updateAccessToken(std::shared_ptr<std::string> token);
+
     void getUserFollowPlaylist();
     void userUnfollowPlaylist();
     void getUserFollowedArtists();
@@ -66,8 +68,14 @@ public:
     void checkIfUserFollowsArtistsOrUsers();
     void checkIfCurrentUserFollowsPlaylist();
 
-    UserProfile async_getUserProfile();
+    void getUserProfile(void (*cb)());
+    void getUserTopArtists(void (*cb)(), const std::string &timeRange = "medium_term", int limit = 20,
+                                 int offset = 0);
+    void getUserTopTracks(void (*cb)(), const std::string &timeRange = "medium_term", int limit = 20,
+                                int offset = 0);
 
 private:
     std::shared_ptr<std::string> accessToken;
+    std::shared_ptr<SpotifyData> spotifyData;
+    std::unique_ptr<APIImpl> apiImpl;
 };

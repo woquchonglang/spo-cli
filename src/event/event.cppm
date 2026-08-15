@@ -32,10 +32,11 @@ enum class Event {
 
 export class EventHandler {
 public:
-    EventHandler(moodycamel::ConcurrentQueue<SPOCLI::Event> &queue, SpotifyAuth &auth)
-            : eventQueue(queue), api(nullptr), auth(auth) {};
+    EventHandler(moodycamel::ConcurrentQueue<SPOCLI::Event> &queue, SpotifyAuth &auth,
+                 std::shared_ptr<SpotifyData> spotifyData)
+            : eventQueue(queue), api(nullptr, spotifyData), auth(auth) {};
 
-    void handle(std::stop_token st, std::shared_ptr<SpotifyData> spotifyData);
+    void handle(std::stop_token st);
 
     void scheduleExitHandler(std::function<void()> handler) { exitHandler.push_back(handler); }
 

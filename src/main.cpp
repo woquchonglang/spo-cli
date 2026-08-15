@@ -1,4 +1,3 @@
-
 import config;
 import spotifyAuth;
 import spotifyWebAPI;
@@ -15,9 +14,9 @@ int main() {
     moodycamel::ConcurrentQueue<SPOCLI::Event> eventQueue;
     SpotifyAuth auth(config);
 
-    EventHandler eventHandler(eventQueue, auth);
-    std::jthread eventThread(
-            [&eventHandler, spotifyData](std::stop_token st) { eventHandler.handle(st, spotifyData); });
+    EventHandler eventHandler(eventQueue, auth, spotifyData);
+    std::jthread eventThread([&eventHandler](std::stop_token st) { eventHandler.handle(st); });
+
     eventHandler.scheduleExitHandler([&eventThread] { eventThread.request_stop(); });
 
     Ui ui;

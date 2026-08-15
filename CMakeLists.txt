@@ -67,6 +67,10 @@ add_compile_definitions(STB_IMAGE_IMPLEMENTATION)
 
 target_include_directories(caches INTERFACE lib/stb)
 
+add_compile_definitions(BOOST_ASIO_HAS_IO_URING)
+add_compile_definitions(BOOST_ASIO_DISABLE_EPOLL)
+add_compile_definitions(BOOST_ASIO_HAS_IO_URING_AS_DEFAULT)
+
 # concurrentqueue has so many static func and static value which can expose global module TU local
 target_compile_options(concurrentqueue INTERFACE -Wno-expose-global-module-tu-local)
 
@@ -75,7 +79,7 @@ target_compile_options(skyr-url INTERFACE -Wno-deprecated-literal-operator -Wno-
 target_link_libraries(
   ${CMAKE_PROJECT_NAME} PRIVATE ftxui::modules SDBusCpp::sdbus-c++ nlohmann_json_modules httplib
                                  tomlplusplus_modules curl ssl crypto miniaudio concurrentqueue caches
-                                 skyr-url base64)
+                                 skyr-url base64 uring)
 
 # add_compile_options(-Wexpose-global-module-tu-local)
 
@@ -86,5 +90,7 @@ target_sources(${CMAKE_PROJECT_NAME}
   PUBLIC FILE_SET CXX_MODULES FILES ${MODULE_FILES}
   PUBLIC ${SRCFILES}
 )
+
+target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE lib/asio lib/beast)
 
 set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES CXX_MODULE_STD ON)

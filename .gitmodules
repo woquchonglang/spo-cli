@@ -40,3 +40,9 @@
 [submodule "lib/url"]
 	path = lib/url
 	url = https://github.com/glynos/url
+[submodule "lib/beast"]
+	path = lib/beast
+	url = https://github.com/boostorg/beast.git
+[submodule "lib/asio"]
+	path = lib/asio
+	url = https://github.com/boostorg/asio.git
