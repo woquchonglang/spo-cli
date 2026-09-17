@@ -5,7 +5,7 @@ a spotify tui app, less is more
 need: Spotify Premium
 
 # Feature
-os: linux (no windows or macOS)
+os: linux (relying heavily on various features of Linux,not support windows and macOS, btw, I use arch linux)
 
 - [ ] vim key
 - [ ] local music
@@ -37,11 +37,6 @@ login_redirect_uri
 
 ### access token
 
-## local music
-Audio backend
-
-### meta
-.mp3: Audio file with ID3 version 2.3.0, contains: MPEG ADTS, layer III, v1, 320 kbps, 44.1 kHz, Stereo
 
 ### lyrics
 
@@ -49,8 +44,22 @@ Audio backend
 
 ## build
 
+### requirements
+- cmake >= 4.4
+- gcc >= 16.2
+- linux >= 6.1
+- openssl
+- liburing
+
+
 ```
 touch default.toml
+```
+
+
+```sh
+cmake -B build -G Ninja
+ninja -C build
 ```
 
 
