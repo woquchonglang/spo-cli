@@ -35,6 +35,13 @@ std::vector<std::string> scopes = {
     "user-read-private",
 };
 
+struct TokenCache {
+    std::string access_token;
+    std::string refresh_token;
+    int expires_in;
+    std::chrono::system_clock::time_point token_acquire_time;
+};
+
 export class SpotifyAuth {
 public:
     SpotifyAuth(const Config &config);
@@ -43,6 +50,11 @@ public:
 
 private:
     void exchangeCodeForToken(std::string_view code);
+    void saveTokenCache(const TokenCache &cache,
+                        const std::filesystem::path &cache_path);
+    std::optional<TokenCache>
+    loadTokenCache(const std::filesystem::path &cachePath);
+
     void refreshAccessToken();
 
 private:
@@ -50,4 +62,5 @@ private:
     std::shared_ptr<std::string> access_token = std::make_shared<std::string>();
     std::string refresh_token;
     int expires_in;
+    std::filesystem::path cache_file;
 };

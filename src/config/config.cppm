@@ -11,5 +11,7 @@ public:
     std::string client_id;
     std::string client_secret;
     std::string login_redirect_url;
-};
 
+
+    std::string cache_path;
+};
