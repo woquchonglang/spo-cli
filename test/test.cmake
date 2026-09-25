@@ -1,0 +1,44 @@
+set(BOOST_HTTP_BUILD_TESTS OFF)
+set(BOOST_HTTP_BUILD_EXAMPLES OFF)
+
+set(BOOST_COROSIO_BUILD_TESTS OFF)
+set(BOOST_COROSIO_BUILD_BENCH OFF)
+set(BOOST_COROSIO_BUILD_EXAMPLES OFF)
+
+set(BOOST_CAPY_BUILD_TESTS OFF)
+set(BOOST_CAPY_BUILD_EXAMPLES OFF)
+set(BOOST_CAPY_BUILD_BENCH OFF)
+
+set(BOOST_BURL_BUILD_TESTS OFF)
+set(BOOST_BURL_BUILD_EXAMPLES OFF)
+
+
+FetchContent_Declare(
+  Catch2
+  GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+  GIT_TAG v3.16.0
+  GIT_SHALLOW TRUE
+  GIT_PROGRESS TRUE
+  SOURCE_DIR "${THIRD_PARTY_DIR}/Catch2"
+)
+FetchContent_MakeAvailable(Catch2)
+
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
+set(CMAKE_CXX_STANDARD 26)
+set(FETCHCONTENT_QUIET OFF)
+set(FETCHCONTENT_UPDATES_DISCONNECTED ON)
+
+add_executable(spo-test)
+target_link_libraries(spo-test PUBLIC Catch2::Catch2WithMain spo_src)
+set_target_properties(spo-test PROPERTIES
+    CXX_MODULE_STD ON
+)
+
+file(GLOB_RECURSE SRCFILES "test/*.cpp")
+target_sources(spo-test PRIVATE ${SRCFILES})
+
+
+
+
+

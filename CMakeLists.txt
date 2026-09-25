@@ -14,6 +14,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+option(SPOCLI_TEST "Set to ON to build tests" ON)
+
 # linker
 find_program(MOLD_PROGRAM mold)
 if (MOLD_PROGRAM)
@@ -96,5 +98,7 @@ target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE
     $<$<CONFIG:Release>:-flto=auto>
 )
 
+if(SPOCLI_TEST)
+  include(test/test.cmake)
+endif()
 
-set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES CXX_MODULE_STD ON)
