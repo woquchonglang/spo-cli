@@ -4,7 +4,7 @@ export module event;
 import std;
 import spotifyAuth;
 import spotifyWebAPI;
-import concurrentqueue;
+import spsc;
 
 export namespace SPOCLI {
 
@@ -30,21 +30,25 @@ enum class Event {
 
 }
 
+export moodycamel::Spsc<SPOCLI::Event> eventQueue;
+
 export class EventHandler {
 public:
-    EventHandler(moodycamel::ConcurrentQueue<SPOCLI::Event> &queue, SpotifyAuth &auth,
-                 std::shared_ptr<SpotifyData> spotifyData)
+    EventHandler(moodycamel::Spsc<SPOCLI::Event> &queue,
+                 SpotifyAuth &auth, std::shared_ptr<SpotifyData> spotifyData)
             : eventQueue(queue), api(nullptr, spotifyData), auth(auth) {};
 
     void handle(std::stop_token st);
 
-    void scheduleExitHandler(std::function<void()> handler) { exitHandler.push_back(handler); }
+    void scheduleExitHandler(std::function<void()> handler) {
+        exitHandler.push_back(handler);
+    }
 
 private:
-    moodycamel::ConcurrentQueue<SPOCLI::Event> &eventQueue;
+    moodycamel::Spsc<SPOCLI::Event> &eventQueue;
 
     SpotifyWebAPI api;
-    SpotifyAuth &auth;
+    SpotifyAuth auth;
 
     std::vector<std::function<void()>> exitHandler;
 };

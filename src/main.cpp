@@ -6,7 +6,7 @@ import std;
 import ftxui;
 import httplib;
 import event;
-import concurrentqueue;
+import spsc;
 
 int main() {
     Config config;
@@ -15,9 +15,12 @@ int main() {
     SpotifyAuth auth(config);
 
     EventHandler eventHandler(eventQueue, auth, spotifyData);
+    std::jthread eventThread(
+            [&eventHandler](std::stop_token st) { eventHandler.handle(st); });
     std::jthread eventThread([&eventHandler](std::stop_token st) { eventHandler.handle(st); });
 
-    eventHandler.scheduleExitHandler([&eventThread] { eventThread.request_stop(); });
+    eventHandler.scheduleExitHandler(
+            [&eventThread] { eventThread.request_stop(); });
 
     Ui ui;
     std::jthread uiThread(&Ui::render, &ui, std::ref(eventQueue), spotifyData);

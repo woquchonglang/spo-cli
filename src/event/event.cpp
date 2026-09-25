@@ -1,7 +1,6 @@
 module;
 module event;
 
-import concurrentqueue;
 import ftxui;
 import std;
 import spotifyAuth;

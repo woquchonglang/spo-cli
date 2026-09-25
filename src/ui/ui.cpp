@@ -2,13 +2,14 @@ module;
 module ui;
 
 import ftxui;
-import concurrentqueue;
+import spsc;
 import std;
 import kittyImageComponent;
 import spotifyWebAPI;
 import event;
 
-void Ui::renderLogin(moodycamel::ConcurrentQueue<SPOCLI::Event> &queue, std::shared_ptr<SpotifyData> spotifyData) {
+void Ui::renderLogin(moodycamel::Spsc<SPOCLI::Event> &queue,
+                     std::shared_ptr<SpotifyData> spotifyData) {
     queue.enqueue(SPOCLI::Event::Login);
 
     auto cover = Renderer([&] {
