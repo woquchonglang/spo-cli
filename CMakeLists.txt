@@ -14,15 +14,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-option(SPOCLI_TEST "Set to ON to build tests" ON)
-
-# linker
-find_program(MOLD_PROGRAM mold)
-if (MOLD_PROGRAM)
-    add_link_options(-fuse-ld=mold)
-else ()
-    message(STATUS "mold not found")
-endif ()
+option(SPOCLI_TEST "Set to ON to build tests" OFF)
 
 add_executable(${CMAKE_PROJECT_NAME} src/main.cpp)
 
@@ -52,10 +44,10 @@ set(MINIAUDIO_ENABLE_ALSA ON)
 set(BASE64_ENABLE_TESTING OFF)
 set(skyr_BUILD_TESTS OFF)
 set(skyr_ENABLE_JSON_FUNCTIONS OFF)
+set(SPDLOG_USE_STD_FORMAT ON)
 
 add_subdirectory(lib/nlohmann-json)
 add_subdirectory(lib/tomlplusplus)
-add_subdirectory(lib/sdbus-cpp)
 add_subdirectory(lib/ftxui)
 add_subdirectory(lib/cpp-httplib)
 add_subdirectory(lib/miniaudio)
@@ -63,25 +55,14 @@ add_subdirectory(lib/concurrentqueue)
 add_subdirectory(lib/readerwriterqueue)
 add_subdirectory(lib/url)
 add_subdirectory(lib/base64)
-
-add_library(caches INTERFACE)
-target_include_directories(caches INTERFACE lib/caches/include)
-
-add_library(stb INTERFACE)
-add_compile_definitions(STB_IMAGE_IMPLEMENTATION)
-
-target_include_directories(caches INTERFACE lib/stb)
+add_subdirectory(lib/librespot-cpp)
+add_subdirectory(lib/cava)
+add_subdirectory(lib/spdlog)
 
 add_compile_definitions(BOOST_ASIO_HAS_IO_URING)
 add_compile_definitions(BOOST_ASIO_DISABLE_EPOLL)
 add_compile_definitions(BOOST_ASIO_HAS_IO_URING_AS_DEFAULT)
 add_compile_definitions(BOOST_ASIO_SEPARATE_COMPILATION)
-
-
-# concurrentqueue has so many static func and static value which can expose global module TU local
-target_compile_options(concurrentqueue INTERFACE -Wno-expose-global-module-tu-local)
-
-target_compile_options(skyr-url INTERFACE -Wno-deprecated-literal-operator -Wno-unused-result)
 
 add_subdirectory(src)
 
@@ -89,10 +70,17 @@ add_subdirectory(src)
 target_link_libraries(
   ${CMAKE_PROJECT_NAME} PRIVATE spo_src)
 
-# add_compile_options(-Wexpose-global-module-tu-local)
+# linker
+find_program(MOLD_PROGRAM mold)
+if (MOLD_PROGRAM)
+  target_link_options(${CMAKE_PROJECT_NAME} PRIVATE -fuse-ld=mold)
+else ()
+    message(STATUS "mold not found")
+endif ()
 
 set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES CXX_MODULE_STD ON)
 
+# target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE -freflection)
 
 target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE
     $<$<CONFIG:Release>:-flto=auto>
