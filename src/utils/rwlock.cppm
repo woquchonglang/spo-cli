@@ -8,12 +8,20 @@ public:
     struct ReadGuard {
         std::shared_lock<std::shared_mutex> lock;
         const T &value;
+        ReadGuard(std::shared_lock<std::shared_mutex> l, const T &v)
+                : lock(std::move(l)), value(v) {}
+        ReadGuard(const ReadGuard &) = delete;
+        ReadGuard &operator=(const ReadGuard &) = delete;
     };
 
     struct WriteGuard {
         std::unique_lock<std::shared_mutex> lock;
         T &value;
     };
+
+    RwLock()
+    requires std::default_initializable<T>
+            : value_(T{}) {}
 
     explicit RwLock(T value) : value_(std::move(value)) {}
 

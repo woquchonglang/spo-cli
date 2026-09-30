@@ -1,3 +1,7 @@
+#include <boost/asio.hpp>
+#include <boost/asio/awaitable.hpp>
+#include <boost/asio/use_awaitable.hpp>
+
 import config;
 import spotifyAuth;
 import spotifyWebAPI;
@@ -7,23 +11,32 @@ import ftxui;
 import httplib;
 import event;
 import spsc;
+import librespot;
 
 int main() {
-    Config config;
-    std::shared_ptr<SpotifyData> spotifyData = std::make_shared<SpotifyData>();
-    moodycamel::ConcurrentQueue<SPOCLI::Event> eventQueue;
-    SpotifyAuth auth(config);
+    boost::asio::io_context ioc;
 
-    EventHandler eventHandler(eventQueue, auth, spotifyData);
+    Config config;
+    SpotifyData spotifyData;
+    SpotifyAuth auth(config);
+    Ui ui;
+    Librespot librespot(ioc.get_executor(), spotifyData);
+
+    EventHandler eventHandler(auth, spotifyData, librespot);
+
+    eventHandler.scheduleExitHandler([&librespot] { librespot.stop(); });
+
     std::jthread eventThread(
             [&eventHandler](std::stop_token st) { eventHandler.handle(st); });
-    std::jthread eventThread([&eventHandler](std::stop_token st) { eventHandler.handle(st); });
 
     eventHandler.scheduleExitHandler(
             [&eventThread] { eventThread.request_stop(); });
 
-    Ui ui;
-    std::jthread uiThread(&Ui::render, &ui, std::ref(eventQueue), spotifyData);
+
+    std::jthread uiThread([&ui, &spotifyData]() { ui.render(spotifyData); });
+
+
+    ioc.run();
 
     eventThread.join();
 }
