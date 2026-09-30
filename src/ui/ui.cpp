@@ -7,6 +7,7 @@ import std;
 import kittyImageComponent;
 import spotifyWebAPI;
 import event;
+import proc;
 
 void Ui::renderLogin(moodycamel::Spsc<SPOCLI::Event> &queue,
                      std::shared_ptr<SpotifyData> spotifyData) {
@@ -205,13 +206,24 @@ void Ui::render(moodycamel::ConcurrentQueue<SPOCLI::Event> &queue, std::shared_p
 
     auto maybe_help_component = Maybe(help_component, &help_show);
 
+    // proc info
+    auto proc_info = Renderer([&]() -> Element {
+        auto cpu_usage =
+                Proc::Info::instance().cpu_info.read().value.get_usage();
+        std::wstring wcpu = std::format(L"{:.1f}", cpu_usage);
+        auto mem_mb =
+                Proc::Info::instance().stat_info.read().value.get_memory();
+        std::wstring wmem = std::format(L"{:.1f}", mem_mb);
+        return text("cpu:" + ::to_string(wcpu) + "%" + " " +
+                    "mem:" + ::to_string(wmem) + "M") |
+               center;
+    });
+
+
+    // main ui
     auto renderer = Renderer(container, [&] {
-        return vbox({
-                tab_toggle->Render(),
-                separator(),
-                tab_container->Render(),
-                maybe_help_component->Render() | center,
-        });
+        return vbox({ filler(), container->Render() | center,
+                      hbox({ filler(), proc_info->Render() }) });
     });
 
 
