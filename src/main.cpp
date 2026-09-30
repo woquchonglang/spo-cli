@@ -12,19 +12,29 @@ import httplib;
 import event;
 import spsc;
 import librespot;
+import log;
 
 int main() {
     boost::asio::io_context ioc;
 
     Config config;
+    Log::instance().info("config init");
     SpotifyData spotifyData;
     SpotifyAuth auth(config);
+    Log::instance().info("spotify auth init");
+
     Ui ui;
+    Log::instance().info("ui visualizer init");
+
     Librespot librespot(ioc.get_executor(), spotifyData);
+    Log::instance().info("librespot init");
 
     EventHandler eventHandler(auth, spotifyData, librespot);
 
     eventHandler.scheduleExitHandler([&librespot] { librespot.stop(); });
+
+    Log::instance().info("eventHandler init");
+
 
     std::jthread eventThread(
             [&eventHandler](std::stop_token st) { eventHandler.handle(st); });
@@ -35,6 +45,8 @@ int main() {
 
     std::jthread uiThread([&ui, &spotifyData]() { ui.render(spotifyData); });
 
+    eventHandler.scheduleExitHandler([&ioc] { ioc.stop(); });
+    Log::instance().info("cororuntime init ");
 
     ioc.run();
 
