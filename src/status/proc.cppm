@@ -1,4 +1,5 @@
 module;
+#include <boost/asio.hpp>
 export module proc;
 
 import std;
@@ -45,12 +46,10 @@ public:
     RwLock<CpuInfo> cpu_info;
     RwLock<StatmInfo> stat_info;
 
+    boost::asio::awaitable<void> sample(boost::asio::io_context &ioc);
+
 private:
     Info();
     friend class Singleton<Info>;
-
-    void sample_thread();
-
-    std::jthread sampler;
 };
 }

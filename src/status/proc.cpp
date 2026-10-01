@@ -1,5 +1,6 @@
 module;
 #include <unistd.h>
+#include <boost/asio.hpp>
 module proc;
 
 import event;
@@ -82,16 +83,17 @@ void StatmInfo::update_memory() {
 
 double StatmInfo::get_memory() const { return rss_mb; }
 
-Info::Info()
-        : cpu_info(CpuInfo{})
-        , stat_info(StatmInfo{})
-        , sampler(&Info::sample_thread, this) {
-    sampler.detach();
-}
+Info::Info() : cpu_info(CpuInfo{}), stat_info(StatmInfo{}) {}
 
-void Info::sample_thread() {
-    while (1) {
-        std::this_thread::sleep_until(cpu_info.read().value.next_tick);
+boost::asio::awaitable<void> Info::sample(boost::asio::io_context &ioc) {
+    boost::asio::steady_timer timer(ioc);
+    while (true) {
+        auto now = std::chrono::steady_clock::now();
+        auto next = cpu_info.read().value.next_tick;
+        if (next > now) {
+            timer.expires_at(next);
+            co_await timer.async_wait(boost::asio::use_awaitable);
+        }
         cpu_info.write().value.update_usage();
         stat_info.write().value.update_memory();
         eventQueue.enqueue(SPOCLI::Event::Refresh);

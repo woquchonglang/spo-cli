@@ -1,7 +1,4 @@
 #include <boost/asio.hpp>
-#include <boost/asio/awaitable.hpp>
-#include <boost/asio/use_awaitable.hpp>
-
 import config;
 import spotifyAuth;
 import spotifyWebAPI;
@@ -19,6 +16,15 @@ int main() {
 
     Config config;
     Log::instance().info("config init");
+    boost::asio::co_spawn(
+    boost::asio::co_spawn(
+            ioc,
+            [&ioc]() -> boost::asio::awaitable<void> {
+                co_await Proc::Info::instance().sample(ioc);
+            },
+            boost::asio::detached);
+    Log::instance().info("proc init");
+
     SpotifyData spotifyData;
     SpotifyAuth auth(config);
     Log::instance().info("spotify auth init");
