@@ -24,6 +24,9 @@ target_include_directories(caches INTERFACE ${CMAKE_SOURCE_DIR}/lib/caches/inclu
 add_library(stb INTERFACE)
 add_compile_definitions(STB_IMAGE_IMPLEMENTATION)
 
+add_library(cava STATIC ${CMAKE_SOURCE_DIR}/lib/cava/cavacore.c)
+target_include_directories(cava PUBLIC ${CMAKE_SOURCE_DIR}/lib/cava)
+
 target_compile_options(skyr-url INTERFACE -Wno-deprecated-literal-operator -Wno-unused-result -Wno-unused-value)
 
 target_include_directories(caches INTERFACE ${CMAKE_SOURCE_DIR}/lib/stb)
@@ -32,7 +35,7 @@ target_link_libraries(
   spo_src PUBLIC ftxui::modules SDBusCpp::sdbus-c++ nlohmann_json_modules httplib
                  tomlplusplus_modules curl ssl crypto miniaudio concurrentqueue caches
                  skyr-url base64 uring librespot-cpp qrencode readerwriterqueue
-                 fmt spdlog fftw3 cavacore)
+                 fmt spdlog fftw3 cava)
 
 # version
 execute_process(
