@@ -24,11 +24,7 @@ target_include_directories(caches INTERFACE ${CMAKE_SOURCE_DIR}/lib/caches/inclu
 add_library(stb INTERFACE)
 add_compile_definitions(STB_IMAGE_IMPLEMENTATION)
 
-# concurrentqueue has so many static func and static value which can expose global module TU local
-target_compile_options(concurrentqueue INTERFACE -Wno-expose-global-module-tu-local)
-
-target_compile_options(skyr-url INTERFACE -Wno-deprecated-literal-operator -Wno-unused-result)
-
+target_compile_options(skyr-url INTERFACE -Wno-deprecated-literal-operator -Wno-unused-result -Wno-unused-value)
 
 target_include_directories(caches INTERFACE ${CMAKE_SOURCE_DIR}/lib/stb)
 

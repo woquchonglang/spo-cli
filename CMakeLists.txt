@@ -3,8 +3,8 @@ cmake_minimum_required(VERSION 4.4)
 set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD f35a9ac6-8463-4d38-8eec-5d6008153e7d)
 set(CMAKE_PROJECT_NAME spo-cli)
 
-project(${CMAKE_PROJECT_NAME})
-
+set(CMAKE_C_COMPILER    /usr/bin/clang)
+set(CMAKE_CXX_COMPILER  /usr/bin/clang++)
 set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g3")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -g0")
@@ -13,6 +13,8 @@ set(CMAKE_BUILD_TYPE "Debug")
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+project(${CMAKE_PROJECT_NAME})
 
 option(SPOCLI_TEST "Set to ON to build tests" OFF)
 
@@ -60,15 +62,24 @@ add_subdirectory(lib/cava)
 add_subdirectory(lib/spdlog)
 
 add_compile_definitions(BOOST_ASIO_HAS_IO_URING)
-add_compile_definitions(BOOST_ASIO_DISABLE_EPOLL)
-add_compile_definitions(BOOST_ASIO_HAS_IO_URING_AS_DEFAULT)
+# add_compile_definitions(BOOST_ASIO_HAS_IO_URING_AS_DEFAULT)
 add_compile_definitions(BOOST_ASIO_SEPARATE_COMPILATION)
+
+add_compile_options(
+    $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CONFIG:Release>>:-ffunction-sections>
+    $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CONFIG:Release>>:-fdata-sections>
+)
 
 add_subdirectory(src)
 
 # link
 target_link_libraries(
   ${CMAKE_PROJECT_NAME} PRIVATE spo_src)
+
+target_link_options(spo-cli PRIVATE
+    $<$<CONFIG:Release>:-Wl,--gc-sections>
+    $<$<CONFIG:Release>:-Wl,--as-needed>
+)
 
 # linker
 find_program(MOLD_PROGRAM mold)
