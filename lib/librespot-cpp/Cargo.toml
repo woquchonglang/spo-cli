@@ -1,0 +1,36 @@
+[package]
+name = "librespot-cpp"
+version = "0.1.0"
+authors = ["woquchonglang <3253932102@qq.com>"]
+edition = "2024"
+
+[dependencies]
+cxx = "1.0"
+librespot = { git = "https://github.com/librespot-org/librespot.git", branch = "dev"}
+librespot-oauth = { git = "https://github.com/librespot-org/librespot.git", branch = "dev"}
+librespot-metadata = { git = "https://github.com/librespot-org/librespot.git", branch = "dev"}
+librespot-core = { git = "https://github.com/librespot-org/librespot.git", branch = "dev"}
+tokio-core = "0.1.18"
+tokio = "1.53.1"
+serde_json = "1.0.151"
+futures = "0.3.34"
+chrono = "0.4.45"
+
+# fix for https://github.com/rustyhorde/vergen/issues/478#issuecomment-3769340357
+vergen = "=9.0.6"
+crossbeam-channel = "0.5.17"
+
+[build-dependencies]
+cxx-build = "1.0"
+
+[lib]
+crate-type = ["staticlib"]
+name = "librespot_cpp"
+path = "src/librespot.rs"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

@@ -8,13 +8,13 @@ import event;
 import spsc;
 import librespot;
 import log;
+import proc;
 
 int main() {
     boost::asio::io_context ioc;
 
     Config config;
     Log::instance().info("config init");
-    boost::asio::co_spawn(
     boost::asio::co_spawn(
             ioc,
             [&ioc]() -> boost::asio::awaitable<void> {
@@ -42,17 +42,11 @@ int main() {
             boost::asio::detached);
     Log::instance().info("eventHandler init");
 
-
-
-    eventHandler.scheduleExitHandler(
-            [&eventThread] { eventThread.request_stop(); });
-
-
-    std::jthread uiThread([&ui, &spotifyData]() { ui.render(spotifyData); });
+    std::jthread uiThread(
+            [&ui, &spotifyData]() { ui.render(eventQueue, spotifyData); });
 
     eventHandler.scheduleExitHandler([&ioc] { ioc.stop(); });
     Log::instance().info("cororuntime init ");
 
     ioc.run();
-
 }

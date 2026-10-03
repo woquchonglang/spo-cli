@@ -5,7 +5,6 @@ module event;
 import ftxui;
 import std;
 import spotifyWebAPI;
-import mpris;
 
 AsyncEventHandler::AsyncEventHandler(boost::asio::io_context &ioc,
                                      Config &config, SpotifyData &spotifyData,
@@ -48,49 +47,37 @@ boost::asio::awaitable<void> AsyncEventHandler::handle() {
                         boost::asio::detached);
             } break;
             case SPOCLI::Event::GetUserProfile:
-                api.getUserProfile([]() {
-                    ftxui::animation::RequestAnimationFrame();
-                    mpris_notify_spsc.enqueue(MpricEvent::all_update);
-                });
+                api.getUserProfile(
+                        []() { ftxui::animation::RequestAnimationFrame(); });
 
                 break;
             case SPOCLI::Event::GetUserTopArtists:
-                api.getUserTopArtists([]() {
-                    ftxui::animation::RequestAnimationFrame();
-                    mpris_notify_spsc.enqueue(MpricEvent::all_update);
-                });
+                api.getUserTopArtists(
+                        []() { ftxui::animation::RequestAnimationFrame(); });
 
                 break;
             case SPOCLI::Event::GetUserTopTracks:
-                api.getUserTopTracks([]() {
-                    ftxui::animation::RequestAnimationFrame();
-                    mpris_notify_spsc.enqueue(MpricEvent::all_update);
-                });
+                api.getUserTopTracks(
+                        []() { ftxui::animation::RequestAnimationFrame(); });
                 break;
             case SPOCLI::Event::GetUserFollowedPlaylist:
                 break;
             case SPOCLI::Event::GetUserPlaylists:
-                api.GetUserPlaylists([]() {
-                    ftxui::animation::RequestAnimationFrame();
-                    mpris_notify_spsc.enqueue(MpricEvent::all_update);
-                });
+                api.GetUserPlaylists(
+                        []() { ftxui::animation::RequestAnimationFrame(); });
 
                 break;
                 // player
             case SPOCLI::Event::GetCurrentlyPlayingTrack:
-                api.GetCurrentlyPlayingTrack([]() {
-                    ftxui::animation::RequestAnimationFrame();
-                    mpris_notify_spsc.enqueue(MpricEvent::all_update);
-                });
+                api.GetCurrentlyPlayingTrack(
+                        []() { ftxui::animation::RequestAnimationFrame(); });
                 break;
             case SPOCLI::Event::GetAvailableDevice:
                 api.GetAvailableDevices(nullptr);
                 break;
             case SPOCLI::Event::GetUserQueue:
-                api.GetUserQueue([]() {
-                    ftxui::animation::RequestAnimationFrame();
-                    mpris_notify_spsc.enqueue(MpricEvent::all_update);
-                });
+                api.GetUserQueue(
+                        []() { ftxui::animation::RequestAnimationFrame(); });
                 break;
             case SPOCLI::Event::SkipToNext: {
                 api.skipToNext(
@@ -113,16 +100,12 @@ boost::asio::awaitable<void> AsyncEventHandler::handle() {
                         guard1.value.progress_ms - 300);
             } break;
             case SPOCLI::Event::Resume:
-                api.ResumePlayback([]() {
-                    ftxui::animation::RequestAnimationFrame();
-                    mpris_notify_spsc.enqueue(MpricEvent::all_update);
-                });
+                api.ResumePlayback(
+                        []() { ftxui::animation::RequestAnimationFrame(); });
                 break;
             case SPOCLI::Event::Pause:
-                api.PausePlayback([]() {
-                    ftxui::animation::RequestAnimationFrame();
-                    mpris_notify_spsc.enqueue(MpricEvent::all_update);
-                });
+                api.PausePlayback(
+                        []() { ftxui::animation::RequestAnimationFrame(); });
                 break;
             case SPOCLI::Event::SetVolumeUp: {
                 auto guard = api.spotifyData.currentlyPlayTrack.read();

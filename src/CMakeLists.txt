@@ -16,7 +16,7 @@ target_sources(spo_src
   PRIVATE ${SRCFILES}
 )
 
-target_include_directories(spo_src PRIVATE ${CMAKE_SOURCE_DIR}/lib/asio ${CMAKE_SOURCE_DIR}/lib/beast)
+target_include_directories(spo_src PRIVATE ${CMAKE_SOURCE_DIR}/lib/asio/include ${CMAKE_SOURCE_DIR}/lib/beast/include)
 
 add_library(caches INTERFACE)
 target_include_directories(caches INTERFACE ${CMAKE_SOURCE_DIR}/lib/caches/include)
@@ -33,8 +33,8 @@ target_include_directories(caches INTERFACE ${CMAKE_SOURCE_DIR}/lib/stb)
 
 target_link_libraries(
   spo_src PUBLIC ftxui::modules SDBusCpp::sdbus-c++ nlohmann_json_modules httplib
-                 tomlplusplus_modules curl ssl crypto miniaudio concurrentqueue caches
-                 skyr-url base64 uring librespot-cpp qrencode readerwriterqueue
+                 tomlplusplus_modules curl ssl crypto concurrentqueue caches
+                 skyr-url base64 uring librespot-cpp readerwriterqueue
                  fmt spdlog fftw3 cava)
 
 # version

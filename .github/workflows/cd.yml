@@ -1,13 +1,13 @@
 name: CD
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  push:
+    branches:
+      - main
 
 jobs:
   CD:
     permissions:
-      contents: read
-      pull-requests: write
+      contents: write
     runs-on: ubuntu-latest
     container:
         image: archlinux
@@ -22,14 +22,74 @@ jobs:
             diffutils \
             cmake \
             ninja \
+            clang \
+            mold \
+            sdbus-cpp \
+            python \
+            pkgconf \
+            openssl \
+            alsa-lib \
+            fftw \
+            boost \
+            liburing \
+            ccache
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Mark directory as safe for git
+        shell: bash
+        run: |
+          git config --global --add safe.directory '*'
 
       - uses: actions/checkout@v4
         with:
           fetch-depth: 50
+          fetch-tags: true
+          submodules: recursive
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: lib/librespot-cpp -> target
+          cache-on-failure: true
+
+      - name: Setup Ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: linux-release
 
       - name: Cmake
-        run: cmake -B build -G Ninja
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 
       - name: Ninja build
         run: ninja -C build
+
+      - name: Package
+        shell: bash
+        run: |
+          cd build || exit 1
+          tar czvf spo-cli-x86_64-unknown-linux-gnu.tar.gz spo-cli
+          sha256sum spo-cli-x86_64-unknown-linux-gnu.tar.gz > spo-cli-x86_64-unknown-linux-gnu.tar.gz.sha256
+
+      - name: Bump version and push tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          default_bump: false
+          default_prerelease_bump: false
+          release_branches: main
+          custom_release_rules: "ci:patch,refactor:patch,chore:patch,docs:patch,style:patch,build:patch,test:patch"
+          fetch_all_tags: true
+
+      - name: Create a GitHub release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ steps.tag_version.outputs.new_tag }}
+          name: ${{ steps.tag_version.outputs.new_tag }}
+          body: ${{ steps.tag_version.outputs.changelog }}
+          makeLatest: true
+          generateReleaseNotes: true
+          artifacts: "build/*.tar.gz"
 

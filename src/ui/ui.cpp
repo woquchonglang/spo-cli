@@ -2,15 +2,15 @@ module;
 module ui;
 
 import ftxui;
-import spsc;
+import mpmc;
 import std;
 import kittyImageComponent;
 import spotifyWebAPI;
 import event;
 import proc;
 
-void Ui::renderLogin(moodycamel::Spsc<SPOCLI::Event> &queue,
-                     std::shared_ptr<SpotifyData> spotifyData) {
+void Ui::renderLogin(moodycamel::Mpmc<SPOCLI::Event> &queue,
+                     SpotifyData &spotifyData) {
     queue.enqueue(SPOCLI::Event::Login);
 
     auto cover = Renderer([&] {
@@ -23,7 +23,9 @@ void Ui::renderLogin(moodycamel::Spsc<SPOCLI::Event> &queue,
 
     unsigned int index = 0;
     auto login_text = Renderer([&] {
-        return hcenter(vbox({ separatorEmpty(), hbox({ text("logging in ") | italic, spinner(15, index) }) }));
+        return hcenter(
+                vbox({ separatorEmpty(), hbox({ text("logging in ") | italic,
+                                                spinner(15, index) }) }));
     });
 
     auto login = Container::Vertical({
@@ -43,7 +45,7 @@ void Ui::renderLogin(moodycamel::Spsc<SPOCLI::Event> &queue,
 
     Loop loginloop(&screen, login);
 
-    while (!spotifyData->isLogined.read().value) {
+    while (!spotifyData.isLogined.read().value) {
         loginloop.RunOnce();
         index++;
         ftxui::animation::RequestAnimationFrame();
@@ -52,7 +54,8 @@ void Ui::renderLogin(moodycamel::Spsc<SPOCLI::Event> &queue,
 }
 
 
-void Ui::render(moodycamel::ConcurrentQueue<SPOCLI::Event> &queue, std::shared_ptr<SpotifyData> spotifyData) {
+void Ui::render(moodycamel::Mpmc<SPOCLI::Event> &queue,
+                SpotifyData &spotifyData) {
     std::vector<std::string> entries = {
         "Top Albums",
         "Top Artists",
@@ -66,12 +69,12 @@ void Ui::render(moodycamel::ConcurrentQueue<SPOCLI::Event> &queue, std::shared_p
 
 
     // auto userProfile = Renderer([&] {
-    //     if (spotifyData->userProfile.read().value.has_value()) {
-    //         return text("name: " + spotifyData->userProfile.read().value->displayName + "\n" +
-    //                     "email: " + spotifyData->userProfile.read().value->email +
+    //     if (spotifyData.userProfile.read().value.has_value()) {
+    //         return text("name: " + spotifyData.userProfile.read().value->displayName + "\n" +
+    //                     "email: " + spotifyData.userProfile.read().value->email +
     //                     "\n"
     //                     "product: " +
-    //                     spotifyData->userProfile.read().value->product);
+    //                     spotifyData.userProfile.read().value->product);
     //     } else {
     //         queue.enqueue(SPOCLI::Event::GetUserProfile);
     //         return text("Loading...");
@@ -79,11 +82,12 @@ void Ui::render(moodycamel::ConcurrentQueue<SPOCLI::Event> &queue, std::shared_p
     // });
 
     auto userProfile = Renderer([&] {
-        return text("name: " + spotifyData->userProfile.read().value.displayName + "\n" +
-                    "email: " + spotifyData->userProfile.read().value.email +
-                    "\n"
-                    "product: " +
-                    spotifyData->userProfile.read().value.product);
+        return text(
+                "name: " + spotifyData.userProfile.read().value.displayName +
+                "\n" + "email: " + spotifyData.userProfile.read().value.email +
+                "\n"
+                "product: " +
+                spotifyData.userProfile.read().value.product);
     });
 
     auto userProfileLoading = Renderer([&] {
@@ -95,7 +99,7 @@ void Ui::render(moodycamel::ConcurrentQueue<SPOCLI::Event> &queue, std::shared_p
 
     // auto userTopArtists = Renderer([&] {
     //     Elements children = {};
-    //     for (auto i : spotifyData->topArtists.read().value->names) {
+    //     for (auto i : spotifyData.topArtists.read().value->names) {
     //         children.push_back(text(i));
     //     }
     //     return vbox(children);
@@ -109,35 +113,38 @@ void Ui::render(moodycamel::ConcurrentQueue<SPOCLI::Event> &queue, std::shared_p
     MenuOption userTopArtistsOption;
     int userTopArtistsSelected = 0;
     auto userTopArtistsMenu = [&]() -> Component {
-        auto guard = spotifyData->topArtists.read();
-        return Menu(&guard.value.names, &userTopArtistsSelected, userTopArtistsOption);
+        auto guard = spotifyData.topArtists.read();
+        return Menu(&guard.value.names, &userTopArtistsSelected,
+                    userTopArtistsOption);
     }();
 
     MenuOption userTopTracksOption;
     userTopTracksOption.on_enter = [&] {
-        // if (spotifyData->topTracks.read().value.tracks.size() > 0) {
-        //     queue.enqueue(SPOCLI::Event::PlayTrack(spotifyData->topTracks.read().value.uri[userTopTracksSelected]));
+        // if (spotifyData.topTracks.read().value.tracks.size() > 0) {
+        //     queue.enqueue(SPOCLI::Event::PlayTrack(spotifyData.topTracks.read().value.uri[userTopTracksSelected]));
         // }
     };
     int userTopTracksSelected = 0;
     auto userTopTracksMenuComponent = [&]() -> Component {
-        auto guard = spotifyData->topTracks.read();
-        return Menu(&guard.value.tracks, &userTopArtistsSelected, userTopArtistsOption);
+        auto guard = spotifyData.topTracks.read();
+        return Menu(&guard.value.tracks, &userTopArtistsSelected,
+                    userTopArtistsOption);
     }();
 
-    auto userTopTracksMenu = Renderer(userTopTracksMenuComponent, [&]() -> Element {
-        auto guard = spotifyData->topTracks.read();
-        if (guard.value.tracks.size() > 0) {
-            return userTopTracksMenuComponent->Render();
-        } else {
-            queue.enqueue(SPOCLI::Event::GetUserTopTracks);
-            return text("Loading...") | center;
-        }
-    });
+    auto userTopTracksMenu =
+            Renderer(userTopTracksMenuComponent, [&]() -> Element {
+                auto guard = spotifyData.topTracks.read();
+                if (guard.value.tracks.size() > 0) {
+                    return userTopTracksMenuComponent->Render();
+                } else {
+                    queue.enqueue(SPOCLI::Event::GetUserTopTracks);
+                    return text("Loading...") | center;
+                }
+            });
 
     auto user_Profile = Renderer([&] {
         Elements children = {};
-        auto guard = spotifyData->userProfile.read();
+        auto guard = spotifyData.userProfile.read();
         if (guard.value.account_id != "") {
             children.push_back(userProfile->Render());
         } else {
@@ -146,15 +153,17 @@ void Ui::render(moodycamel::ConcurrentQueue<SPOCLI::Event> &queue, std::shared_p
         children.push_back(separatorEmpty());
         children.push_back(userTopArtistsTitle->Render());
         children.push_back(separator());
-        if (spotifyData->topArtists.read().value.names.size() == 0) {
+        if (spotifyData.topArtists.read().value.names.size() == 0) {
             queue.enqueue(SPOCLI::Event::GetUserTopArtists);
         }
         return vbox(children);
     });
 
-    Component userImage = image_view(spotifyData);
+    // Component userImage = image_view(spotifyData);
 
-    auto user_home = Container::Vertical({ Container::Horizontal({ user_Profile, userImage }), userTopTracksMenu });
+    auto user_home = Container::Vertical(
+            { Container::Horizontal({ user_Profile }),
+              userTopTracksMenu });
 
 
     // auto user_home = Container::Vertical({ user_Profile, userTopTracksMenu });

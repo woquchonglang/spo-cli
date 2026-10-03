@@ -5,7 +5,6 @@ export module event;
 import std;
 import spotifyAuthPKCE;
 import spotifyWebAPI;
-import soloist;
 import spsc;
 import mpmc;
 import librespot;
