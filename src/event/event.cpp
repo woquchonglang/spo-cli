@@ -1,21 +1,52 @@
 module;
+#include <boost/asio.hpp>
 module event;
 
 import ftxui;
 import std;
-import spotifyAuth;
 import spotifyWebAPI;
 import mpris;
 
-void EventHandler::handle(std::stop_token st) {
-    while (!st.stop_requested()) {
+AsyncEventHandler::AsyncEventHandler(boost::asio::io_context &ioc,
+                                     Config &config, SpotifyData &spotifyData,
+                                     Librespot &librespot)
+        : api(nullptr, spotifyData)
+        , auth(ioc, config)
+        , librespot(librespot)
+        , ioc(ioc) {};
+
+boost::asio::awaitable<void> AsyncEventHandler::handle() {
+    boost::asio::steady_timer timer(co_await boost::asio::this_coro::executor);
+    while (true) {
         SPOCLI::Event event;
         if (eventQueue.try_dequeue(event)) {
             switch (event) {
-            case SPOCLI::Event::Login:
-                if (auth.login())
-                    api.updateAccessToken(auth.getAccessToken());
-                break;
+            case SPOCLI::Event::Login: {
+                boost::asio::co_spawn(
+                        ioc,
+                        [this]() -> boost::asio::awaitable<void> {
+                            if (co_await auth.login()) {
+                                api.updateAccessToken(auth.getAccessToken());
+                                boost::asio::steady_timer timer(
+                                        co_await boost::asio::this_coro::
+                                                executor);
+                                timer.expires_after(std::chrono::seconds(10));
+                                auto [ec] = co_await timer.async_wait(
+                                        boost::asio::as_tuple(
+                                                boost::asio::use_awaitable));
+                                if (ec)
+                                    co_return;
+
+                                api.GetAvailableDevices([this]() {
+                                    api.TransferPlayback([this]() {
+                                        this->api.GetCurrentlyPlayingTrack(
+                                                nullptr);
+                                    });
+                                });
+                            }
+                        },
+                        boost::asio::detached);
+            } break;
             case SPOCLI::Event::GetUserProfile:
                 api.getUserProfile([]() {
                     ftxui::animation::RequestAnimationFrame();
@@ -35,7 +66,8 @@ void EventHandler::handle(std::stop_token st) {
                     ftxui::animation::RequestAnimationFrame();
                     mpris_notify_spsc.enqueue(MpricEvent::all_update);
                 });
-
+                break;
+            case SPOCLI::Event::GetUserFollowedPlaylist:
                 break;
             case SPOCLI::Event::GetUserPlaylists:
                 api.GetUserPlaylists([]() {
@@ -51,13 +83,23 @@ void EventHandler::handle(std::stop_token st) {
                     mpris_notify_spsc.enqueue(MpricEvent::all_update);
                 });
                 break;
+            case SPOCLI::Event::GetAvailableDevice:
+                api.GetAvailableDevices(nullptr);
+                break;
             case SPOCLI::Event::GetUserQueue:
                 api.GetUserQueue([]() {
                     ftxui::animation::RequestAnimationFrame();
                     mpris_notify_spsc.enqueue(MpricEvent::all_update);
                 });
-
                 break;
+            case SPOCLI::Event::SkipToNext: {
+                api.skipToNext(
+                        []() { ftxui::animation::RequestAnimationFrame(); });
+            } break;
+            case SPOCLI::Event::SkipToPrevious: {
+                api.skipToPrevious(
+                        []() { ftxui::animation::RequestAnimationFrame(); });
+            } break;
             case SPOCLI::Event::SeekRight: {
                 auto guard1 = api.spotifyData.currentlyPlayTrack.read();
                 api.SeekPosition(
@@ -82,6 +124,20 @@ void EventHandler::handle(std::stop_token st) {
                     mpris_notify_spsc.enqueue(MpricEvent::all_update);
                 });
                 break;
+            case SPOCLI::Event::SetVolumeUp: {
+                auto guard = api.spotifyData.currentlyPlayTrack.read();
+                if (guard.value.device.supports_volume) {
+                    auto volume = guard.value.device.volume_percent;
+                    api.setPlaybackVolume(volume + 10);
+                }
+            } break;
+            case SPOCLI::Event::SetVolumeDown: {
+                auto guard = api.spotifyData.currentlyPlayTrack.read();
+                if (guard.value.device.supports_volume) {
+                    auto volume = guard.value.device.volume_percent;
+                    api.setPlaybackVolume(volume - 10);
+                }
+            } break;
             case SPOCLI::Event::Exit:
                 for (auto &handler : exitHandler) {
                     handler();
@@ -103,6 +159,10 @@ void EventHandler::handle(std::stop_token st) {
             api.StartPlayback(ftxui::animation::RequestAnimationFrame, uri);
         }
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        timer.expires_after(std::chrono::milliseconds(100));
+        auto [ec] = co_await timer.async_wait(
+                boost::asio::as_tuple(boost::asio::use_awaitable));
+        if (ec)
+            co_return;
     }
 }

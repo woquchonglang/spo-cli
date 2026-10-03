@@ -23,12 +23,14 @@ os: linux (relying heavily on various features of Linux,not support windows and 
 - [ ] async and multi-thread
 - [ ] custom themes
 
+<img src=".assets/async.webp" width="200">
+
 ## login spotify
 ### api
 [spotify-web-api](https://developer.spotify.com/documentation/web-api)
 
 ### oAuth
-[Authorization Code Flow](https://developer.spotify.com/documentation/web-api/tutorials/code-flow)
+[Authorization Code PKCE Flow](https://developer.spotify.com/documentation/web-api/tutorials/code-pkce-flow)
 
 client_id
 login_redirect_uri

@@ -1,13 +1,15 @@
 module;
+#include <boost/asio.hpp>
 export module event;
 
 import std;
-import spotifyAuth;
+import spotifyAuthPKCE;
 import spotifyWebAPI;
 import soloist;
 import spsc;
 import mpmc;
 import librespot;
+import config;
 
 export namespace SPOCLI {
 
@@ -28,6 +30,7 @@ enum class Event {
 
     //plyaer
     GetCurrentlyPlayingTrack,
+    GetAvailableDevice,
     GetUserQueue,
 
     GetUserPlaylists,
@@ -36,8 +39,12 @@ enum class Event {
     GetUserSavedShows,
     GetUserSavedTracks,
 
+    SkipToNext,
+    SkipToPrevious,
     SeekRight,
     SeekLeft,
+    SetVolumeUp,
+    SetVolumeDown,
 
     Search,
     // lyrics
@@ -66,23 +73,22 @@ enum class Event {
 export moodycamel::Mpmc<SPOCLI::Event> eventQueue;
 export moodycamel::Spsc<std::string> play_song_spsc;
 
-
-export class EventHandler {
+export class AsyncEventHandler {
 public:
-    EventHandler(SpotifyAuth &auth, SpotifyData& spotifyData,
-                 Librespot &librespot)
-            : api(nullptr, spotifyData), auth(auth), librespot(librespot) {};
+    AsyncEventHandler(boost::asio::io_context &ioc, Config &config,
+                      SpotifyData &spotifyData, Librespot &librespot);
 
-    void handle(std::stop_token st);
+    boost::asio::awaitable<void> handle();
 
     void scheduleExitHandler(std::function<void()> handler) {
         exitHandler.push_back(handler);
     }
 
 private:
+    SpotifyAuthPKCE auth;
     SpotifyWebAPI api;
-    SpotifyAuth auth;
     Librespot &librespot;
-
+    boost::asio::io_context &ioc;
     std::vector<std::function<void()>> exitHandler;
+    boost::asio::cancellation_signal cancel;
 };

@@ -44,6 +44,27 @@ export {
     };
 
     // player
+    // "device" : {
+    //     "id": "string",
+    //     "is_active": false,
+    //     "is_private_session": false,
+    //     "is_restricted": false,
+    //     "name": "Kitchen speaker",
+    //     "type": "computer",
+    //     "volume_percent": 59,
+    //     "supports_volume": false
+    // },
+
+    struct Device {
+        std::string id;
+        bool is_active;
+        bool is_private_session;
+        bool is_restricted;
+        std::string name;
+        std::string type;
+        int volume_percent;
+        bool supports_volume;
+    };
 
     struct PlaybackState {
         std::string repeat_state;
@@ -71,6 +92,9 @@ export {
             std::variant<std::monostate, std::string, std::vector<std::string>>;
 
     struct CurrentlyPlayingTrack {
+        // [[deprecated(
+        //         "spotify can't response librespot device, change to use GetAvailableDevices")]]
+        Device device;
         CurrentlyPlaying currently_playing;
         int progress_ms;
         bool isPlaying;
@@ -99,6 +123,7 @@ export {
         RwLock<UserQueueData> userQueue;
         // player
         RwLock<CurrentlyPlayingTrack> currentlyPlayTrack;
+        RwLock<std::vector<Device>> devices;
         // lyrics
         RwLock<std::vector<LyricLine>> curLyric;
 

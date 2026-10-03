@@ -1,9 +1,16 @@
 module;
-export module spotifyAuth;
+#include <boost/asio.hpp>
+#include <boost/asio/ssl.hpp>
+export module spotifyAuthPKCE;
 
 import config;
 import std;
-import timer;
+import nlohmann.json;
+
+static constexpr std::string_view SPOTIFY_CLIENT_ID =
+        "65b708073fc0480ea92a077233ca87bd";
+static constexpr std::string_view NCSPOT_CLIENT_ID =
+        "d420a117a32841c2b3474932e49fb54b";
 
 std::vector<std::string> scopes = {
     // Images
@@ -42,10 +49,12 @@ struct TokenCache {
     std::chrono::system_clock::time_point token_acquire_time;
 };
 
-export class SpotifyAuth {
+
+export class SpotifyAuthPKCE {
 public:
-    SpotifyAuth(const Config &config);
-    bool login();
+    SpotifyAuthPKCE(boost::asio::io_context &ioc, const Config &config);
+    ~SpotifyAuthPKCE();
+    boost::asio::awaitable<bool> login();
     std::shared_ptr<std::string> getAccessToken() { return access_token; }
 
 private:
@@ -54,13 +63,21 @@ private:
                         const std::filesystem::path &cache_path);
     std::optional<TokenCache>
     loadTokenCache(const std::filesystem::path &cachePath);
-
-    void refreshAccessToken();
+    boost::asio::awaitable<nlohmann::json>
+    async_http_post(const std::string &host, const std::string &target,
+                    const std::string &body);
+    boost::asio::awaitable<void> startRefreshTimer();
+    boost::asio::awaitable<void> refreshAccessToken();
+    boost::asio::awaitable<nlohmann::json> async_http_refreshtoken_post();
 
 private:
     const Config &config;
+    std::string codeVerifier;
     std::shared_ptr<std::string> access_token = std::make_shared<std::string>();
     std::string refresh_token;
     int expires_in;
     std::filesystem::path cache_file;
+    boost::asio::io_context &ioc;
+    boost::asio::ssl::context ctx;
+    std::optional<TokenCache> cache;
 };

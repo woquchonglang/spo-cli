@@ -1,11 +1,9 @@
 #include <boost/asio.hpp>
 import config;
-import spotifyAuth;
 import spotifyWebAPI;
 import ui;
 import std;
 import ftxui;
-import httplib;
 import event;
 import spsc;
 import librespot;
@@ -26,8 +24,6 @@ int main() {
     Log::instance().info("proc init");
 
     SpotifyData spotifyData;
-    SpotifyAuth auth(config);
-    Log::instance().info("spotify auth init");
 
     Ui ui;
     Log::instance().info("ui visualizer init");
@@ -35,15 +31,18 @@ int main() {
     Librespot librespot(ioc.get_executor(), spotifyData);
     Log::instance().info("librespot init");
 
-    EventHandler eventHandler(auth, spotifyData, librespot);
+    AsyncEventHandler eventHandler(ioc, config, spotifyData, librespot);
 
     eventHandler.scheduleExitHandler([&librespot] { librespot.stop(); });
-
+    boost::asio::co_spawn(
+            ioc,
+            [&ioc, &eventHandler]() -> boost::asio::awaitable<void> {
+                co_await eventHandler.handle();
+            },
+            boost::asio::detached);
     Log::instance().info("eventHandler init");
 
 
-    std::jthread eventThread(
-            [&eventHandler](std::stop_token st) { eventHandler.handle(st); });
 
     eventHandler.scheduleExitHandler(
             [&eventThread] { eventThread.request_stop(); });
@@ -56,5 +55,4 @@ int main() {
 
     ioc.run();
 
-    eventThread.join();
 }

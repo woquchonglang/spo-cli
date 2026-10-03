@@ -8,6 +8,8 @@ module;
 #include <boost/asio/use_awaitable.hpp>
 module spotifyWebAPI;
 
+import http.client;
+
 namespace beast = boost::beast;
 namespace http = beast::http;
 namespace net = boost::asio;
@@ -42,6 +44,16 @@ struct APIImpl {
     net::awaitable<void> async_http_put(const std::string &host,
                                         const std::string &target,
                                         const std::string &token);
+
+    net::awaitable<void> async_http_put(const std::string &host,
+                                        const std::string &target,
+                                        const std::string &token,
+                                        const std::string &body);
+
+    net::awaitable<void> async_http_post(const std::string &host,
+                                         const std::string &target,
+                                         const std::string &token);
+
     template <typename T>
     void fetchData(const std::string &endpoint, const std::string &target,
                    const std::string &accessToken,
@@ -50,6 +62,13 @@ struct APIImpl {
     void fetch(const std::string &endpoint, const std::string &target,
                const std::string &accessToken,
                std::function<void()> onComplete);
+
+    void put_data(const std::string &endpoint, const std::string &target,
+                  const std::string &accessToken, std::string body,
+                  std::function<void()> onComplete);
+
+    void post(const std::string &endpoint, const std::string &target,
+              const std::string &accessToken, std::function<void()> onComplete);
 
     boost::asio::io_context ioc;
     boost::asio::executor_work_guard<boost::asio::io_context::executor_type>
@@ -68,90 +87,75 @@ template <typename T>
 net::awaitable<T> APIImpl::async_http_get(const std::string &host,
                                           const std::string &target,
                                           const std::string &token) {
-    auto executor = co_await net::this_coro::executor;
-    beast::ssl_stream<beast::tcp_stream> stream(executor, ctx);
-
-    tcp::resolver resolver(executor);
-    auto const results =
-            co_await resolver.async_resolve(host, "443", net::use_awaitable);
-
-    co_await beast::get_lowest_layer(stream).async_connect(results,
-                                                           net::use_awaitable);
-    stream.set_verify_callback(ssl::host_name_verification(host));
-    if (!SSL_set_tlsext_host_name(stream.native_handle(), host.c_str())) {
-        throw boost::system::system_error(boost::system::error_code(
-                ERR_get_error(), net::error::get_ssl_category()));
-    }
-    co_await stream.async_handshake(ssl::stream_base::client,
-                                    net::use_awaitable);
-
     http::request<http::string_body> req{ http::verb::get, target, 11 };
     req.set(http::field::host, host);
     req.set(http::field::authorization, "Bearer " + token);
     req.set(http::field::user_agent, "Beast/1.0");
 
-    co_await http::async_write(stream, req, net::use_awaitable);
-
-    beast::flat_buffer buffer;
-    http::response<http::dynamic_body> res;
-    co_await http::async_read(stream, buffer, res, net::use_awaitable);
+    auto res = co_await client_read(host, "443", ctx, std::move(req));
 
     if (res.result_int() == 200) {
         nlohmann::json response = nlohmann::json::parse(
                 beast::buffers_to_string(res.body().data()));
         auto data = parse_response<T>(response);
-        beast::error_code ec;
-        beast::get_lowest_layer(stream).socket().shutdown(
-                tcp::socket::shutdown_both, ec);
         co_return data;
+    } else {
+        co_return T{};
     }
-
-    beast::error_code ec;
-    beast::get_lowest_layer(stream).socket().shutdown(
-            tcp::socket::shutdown_both, ec);
-    co_return T{};
 }
 
 net::awaitable<void> APIImpl::async_http_put(const std::string &host,
                                              const std::string &target,
                                              const std::string &token) {
-    auto executor = co_await net::this_coro::executor;
-    beast::ssl_stream<beast::tcp_stream> stream(executor, ctx);
-
-    tcp::resolver resolver(executor);
-    auto const results =
-            co_await resolver.async_resolve(host, "443", net::use_awaitable);
-
-    co_await beast::get_lowest_layer(stream).async_connect(results,
-                                                           net::use_awaitable);
-    stream.set_verify_callback(ssl::host_name_verification(host));
-    if (!SSL_set_tlsext_host_name(stream.native_handle(), host.c_str())) {
-        throw boost::system::system_error(boost::system::error_code(
-                ERR_get_error(), net::error::get_ssl_category()));
-    }
-    co_await stream.async_handshake(ssl::stream_base::client,
-                                    net::use_awaitable);
-
     http::request<http::string_body> req{ http::verb::put, target, 11 };
     req.set(http::field::host, host);
     req.set(http::field::authorization, "Bearer " + token);
     req.set(http::field::user_agent, "Beast/1.0");
     req.prepare_payload();
 
-    co_await http::async_write(stream, req, net::use_awaitable);
+    auto res = co_await client_read(host, "443", ctx, std::move(req));
 
-    beast::flat_buffer buffer;
-    http::response<http::dynamic_body> res;
-    co_await http::async_read(stream, buffer, res, net::use_awaitable);
+    auto result = res.result_int();
+    if (result == 200 || result == 204) {
+        co_return;
+    }
+}
 
-    // auto result = res.result_int();
-    // if (result == 200 || result == 204) {
-    //     co_return;
-    // }
+net::awaitable<void> APIImpl::async_http_put(const std::string &host,
+                                             const std::string &target,
+                                             const std::string &token,
+                                             const std::string &body) {
+    http::request<http::string_body> req{ http::verb::put, target, 11 };
+    req.set(http::field::host, host);
+    req.set(http::field::authorization, "Bearer " + token);
+    req.set(http::field::user_agent, "Beast/1.0");
+    req.body() = std::move(body);
+    req.prepare_payload();
 
-    beast::error_code ec;
-    beast::get_lowest_layer(stream).socket().shutdown(
-            tcp::socket::shutdown_both, ec);
+    auto res = co_await client_read(host, "443", ctx, std::move(req));
+
+    auto result = res.result_int();
+    if (result != 204) {
+        printf("put data error\n");
+    }
+    co_return;
+}
+
+net::awaitable<void> APIImpl::async_http_post(const std::string &host,
+                                              const std::string &target,
+                                              const std::string &token) {
+    http::request<http::string_body> req{ http::verb::post, target, 11 };
+    req.set(http::field::host, host);
+    req.set(http::field::authorization, "Bearer " + token);
+    req.set(http::field::user_agent, "Beast/1.0");
+    req.prepare_payload();
+
+    auto res = co_await client_read(host, "443", ctx, std::move(req));
+
+    auto result = res.result_int();
+    if (result != 203) {
+        printf("http post error");
+    }
     co_return;
 }
 
@@ -198,6 +202,47 @@ void APIImpl::fetch(const std::string &endpoint, const std::string &target,
             boost::asio::detached);
 }
 
+void APIImpl::put_data(const std::string &endpoint, const std::string &target,
+                       const std::string &accessToken, std::string body,
+                       std::function<void()> onComplete) {
+    net::co_spawn(
+            ioc,
+            [this, endpoint, target, accessToken, body,
+             onComplete]() -> boost::asio::awaitable<void> {
+                try {
+                    co_await async_http_put(endpoint, target, accessToken,
+                                            body);
+                    if (onComplete)
+                        onComplete();
+                } catch (const std::exception &e) {
+                    std::cerr << "Async error: " << e.what() << std::endl;
+                    if (onComplete)
+                        onComplete();
+                }
+            },
+            boost::asio::detached);
+}
+
+void APIImpl::post(const std::string &endpoint, const std::string &target,
+                   const std::string &accessToken,
+                   std::function<void()> onComplete) {
+    net::co_spawn(
+            ioc,
+            [this, endpoint, target, accessToken,
+             onComplete]() -> boost::asio::awaitable<void> {
+                try {
+                    co_await async_http_post(endpoint, target, accessToken);
+                    if (onComplete)
+                        onComplete();
+                } catch (const std::exception &e) {
+                    std::cerr << "Async error: " << e.what() << std::endl;
+                    if (onComplete)
+                        onComplete();
+                }
+            },
+            boost::asio::detached);
+}
+
 
 SpotifyWebAPI::SpotifyWebAPI(std::shared_ptr<std::string> accessToken,
                              SpotifyData &data)
@@ -212,12 +257,14 @@ void SpotifyWebAPI::updateAccessToken(std::shared_ptr<std::string> token) {
     accessToken = token;
 }
 
-void SpotifyWebAPI::getUserProfile(void (*cb)()) {
+void SpotifyWebAPI::getUserProfile(std::function<void()> cb) {
     apiImpl->fetchData<UserProfile>(
             "api.spotify.com", "/v1/me", *accessToken.get(),
             [this, cb](auto profile) {
                 spotifyData.userProfile.write().value = profile;
-                cb();
+                if (cb) {
+                    cb();
+                }
             });
 }
 
@@ -229,7 +276,7 @@ void SpotifyWebAPI::getUserProfile(void (*cb)()) {
  *             Default: medium_term
  *
  */
-void SpotifyWebAPI::getUserTopArtists(void (*cb)(),
+void SpotifyWebAPI::getUserTopArtists(std::function<void()> cb,
                                       const std::string &timeRange, int limit,
                                       int offset) {
     std::string url = "/v1/me/top/artists";
@@ -237,7 +284,9 @@ void SpotifyWebAPI::getUserTopArtists(void (*cb)(),
             "api.spotify.com", url, *accessToken.get(),
             [this, cb](auto artists) {
                 spotifyData.topArtists.write().value = artists;
-                cb();
+                if (cb) {
+                    cb();
+                }
             });
 }
 
@@ -249,8 +298,9 @@ void SpotifyWebAPI::getUserTopArtists(void (*cb)(),
  *             Default: medium_term
  *
  */
-void SpotifyWebAPI::getUserTopTracks(void (*cb)(), const std::string &timeRange,
-                                     int limit, int offset) {
+void SpotifyWebAPI::getUserTopTracks(std::function<void()> cb,
+                                     const std::string &timeRange, int limit,
+                                     int offset) {
     std::string url = "/v1/me/top/tracks?time_range=" + timeRange +
                       "&limit=" + std::to_string(limit) +
                       "&offset=" + std::to_string(offset);
@@ -258,11 +308,14 @@ void SpotifyWebAPI::getUserTopTracks(void (*cb)(), const std::string &timeRange,
             "api.spotify.com", url, *accessToken.get(),
             [this, cb](auto tracks) {
                 spotifyData.topTracks.write().value = tracks;
-                cb();
+                if (cb) {
+                    cb();
+                }
             });
 }
 
-void SpotifyWebAPI::GetUserPlaylists(void (*cb)(), int limit, int offset) {
+void SpotifyWebAPI::GetUserPlaylists(std::function<void()> cb, int limit,
+                                     int offset) {
     std::string url = "/v1/me/playlists?limit=" + std::to_string(limit) +
                       "&offset=" + std::to_string(offset);
 
@@ -270,57 +323,98 @@ void SpotifyWebAPI::GetUserPlaylists(void (*cb)(), int limit, int offset) {
             "api.spotify.com", url, *accessToken.get(),
             [this, cb](auto playlists) {
                 spotifyData.userPlaylists.write().value = playlists;
-                cb();
+                if (cb) {
+                    cb();
+                }
             });
 }
 
 // player
-void SpotifyWebAPI::GetCurrentlyPlayingTrack(void (*cb)()) {
+
+void SpotifyWebAPI::TransferPlayback(std::function<void()> cb, bool play) {
+    std::string url = "/v1/me/player";
+    auto guard = spotifyData.devices.read();
+    if (!guard.value.empty()) {
+        std::string body = std::format(R"({{"device_ids":["{}"],"play":{}}})",
+                                       guard.value[0].id,
+                                       play ? "true" : "false");
+        apiImpl->put_data("api.spotify.com", url, *accessToken.get(), body, cb);
+    }
+}
+
+void SpotifyWebAPI::GetCurrentlyPlayingTrack(std::function<void()> cb) {
     std::string url = "/v1/me/player/currently-playing";
 
     apiImpl->fetchData<CurrentlyPlayingTrack>(
             "api.spotify.com", url, *accessToken.get(), [this, cb](auto track) {
                 spotifyData.currentlyPlayTrack.write().value = track;
                 spotifyData.update_playback_last_updated_time();
+                if (cb) {
+                    cb();
+                }
+            });
+}
+
+void SpotifyWebAPI::GetAvailableDevices(std::function<void()> cb) {
+    std::string url = "/v1/me/player/devices";
+    apiImpl->fetchData<std::vector<Device>>(
+            "api.spotify.com", url, *accessToken.get(),
+            [cb, this](auto devices) {
+                spotifyData.devices.write().value = devices;
                 cb();
             });
 }
 
-void SpotifyWebAPI::GetUserQueue(void (*cb)()) {
+void SpotifyWebAPI::GetUserQueue(std::function<void()> cb) {
     std::string url = "/v1/me/player/queue";
 
     apiImpl->fetchData<UserQueueData>(
             "api.spotify.com", url, *accessToken.get(),
             [this, cb](auto userQueue) {
                 spotifyData.userQueue.write().value = userQueue;
-                cb();
+                if (cb) {
+                    cb();
+                }
             });
 }
 
-void playPause(void (*cb)()) {}
-
-void SpotifyWebAPI::StartPlayback(void (*cb)(), const PlayTarget play_target,
+void SpotifyWebAPI::StartPlayback(std::function<void()> cb,
+                                  const PlayTarget play_target,
                                   const std::string &device_id,
                                   const int offset, const int position_ms) {
     std::string url = "/v1/me/player/play";
 
-    std::visit(overloaded{
-                       [&url](std::monostate) {},
-                       [&url](std::string) {
-
-                       },
-                       [&url](std::vector<std::string>) {},
-               },
-               play_target);
-
-    auto cbImpl = [cb, this]() {
-        spotifyData.currentlyPlayTrack.write().value.isPlaying = true;
-        cb();
-    };
-    apiImpl->fetch("api.spotify.com", url, *accessToken.get(), cbImpl);
+    std::visit(
+            overloaded{
+                    [&url](std::monostate) {},
+                    [this, &cb, &url, &offset,
+                     &position_ms](const std::string &uri) {
+                        std::string body;
+                        if (uri.starts_with("spotify:track:")) {
+                            body = std::format(
+                                    R"({{"uris":["{}"],"position_ms":{}}})",
+                                    uri, position_ms);
+                        } else {
+                            // TODO: add offset
+                            body = std::format(
+                                    R"({{"context_uri":"{}","position_ms":{}}})",
+                                    uri, position_ms);
+                        }
+                        auto cbImpl = [cb, this]() {
+                            spotifyData.currentlyPlayTrack.write()
+                                    .value.isPlaying = true;
+                            cb();
+                            this->GetCurrentlyPlayingTrack(nullptr);
+                        };
+                        apiImpl->put_data("api.spotify.com", url,
+                                          *accessToken.get(), body, cbImpl);
+                    },
+                    [&url](std::vector<std::string> uris) {},
+            },
+            play_target);
 }
 
-void SpotifyWebAPI::ResumePlayback(void (*cb)()) {
+void SpotifyWebAPI::ResumePlayback(std::function<void()> cb) {
     std::string url = "/v1/me/player/play";
     auto cbImpl = [cb, this]() {
         spotifyData.currentlyPlayTrack.write().value.isPlaying = true;
@@ -329,7 +423,7 @@ void SpotifyWebAPI::ResumePlayback(void (*cb)()) {
     apiImpl->fetch("api.spotify.com", url, *accessToken.get(), cbImpl);
 }
 
-void SpotifyWebAPI::PausePlayback(void (*cb)()) {
+void SpotifyWebAPI::PausePlayback(std::function<void()> cb) {
     std::string url = "/v1/me/player/pause";
     auto cbImpl = [cb, this]() {
         this->spotifyData.currentlyPlayTrack.write().value.isPlaying = false;
@@ -338,12 +432,39 @@ void SpotifyWebAPI::PausePlayback(void (*cb)()) {
     apiImpl->fetch("api.spotify.com", url, *accessToken.get(), cbImpl);
 }
 
-void SpotifyWebAPI::SeekPosition(void (*cb)(), const int position_ms) {
+void SpotifyWebAPI::skipToNext(std::function<void()> cb) {
+    std::string url = "/v1/me/player/next";
+    auto cbImpl = [cb, this]() { cb(); };
+    apiImpl->post("api.spotify.com", url, *accessToken.get(), cbImpl);
+}
+
+void SpotifyWebAPI::skipToPrevious(std::function<void()> cb) {
+    std::string url = "/v1/me/player/previous";
+    auto cbImpl = [cb, this]() { cb(); };
+    apiImpl->post("api.spotify.com", url, *accessToken.get(), cbImpl);
+}
+
+void SpotifyWebAPI::SeekPosition(std::function<void()> cb,
+                                 const int position_ms) {
     std::string url =
             "/v1/me/player/seek?position_ms=" + std::to_string(position_ms);
     auto cbImpl = [cb, this]() {
         this->spotifyData.currentlyPlayTrack.write().value.isPlaying = false;
         cb();
+    };
+    apiImpl->fetch("api.spotify.com", url, *accessToken.get(), cbImpl);
+}
+
+void SpotifyWebAPI::setPlaybackVolume(const int volume, std::string device_id) {
+    std::string url =
+            "/v1/me/player/volume?volume_percent=" + std::to_string(volume);
+    if (!device_id.empty()) {
+        url += "&device_id=" + device_id;
+    }
+    auto cbImpl = [this, volume]() {
+        if (this->spotifyData.devices.write().value.size() > 0) {
+            this->spotifyData.devices.write().value[0].volume_percent = volume;
+        }
     };
     apiImpl->fetch("api.spotify.com", url, *accessToken.get(), cbImpl);
 }
@@ -404,6 +525,7 @@ parse_response<UserTopTracksData>(const nlohmann::json &response) {
     UserTopTracksData data;
     for (const auto &album : response["items"]) {
         data.tracks.push_back(album["name"]);
+        data.uri.push_back(album["uri"]);
     }
     return data;
 }
@@ -424,6 +546,17 @@ parse_response<CurrentlyPlayingTrack>(const nlohmann::json &response) {
     CurrentlyPlayingTrack data{};
     data.progress_ms = response["progress_ms"];
     data.isPlaying = response["is_playing"];
+    if (response.contains("device")) {
+        auto device = response["device"];
+        data.device.id = device["id"];
+        data.device.is_active = device["is_active"];
+        data.device.is_private_session = device["is_private_session"];
+        data.device.is_restricted = device["is_restricted"];
+        data.device.name = device["name"];
+        data.device.type = device["type"];
+        data.device.volume_percent = device["volume_percent"];
+        data.device.supports_volume = device["supports_volume"];
+    }
     auto item = response["item"];
     if (!item.is_null()) {
         data.currently_playing.name = item["name"];
@@ -457,6 +590,28 @@ parse_response<CurrentlyPlayingTrack>(const nlohmann::json &response) {
         }
     }
     return data;
+}
+
+template <>
+std::vector<Device>
+parse_response<std::vector<Device>>(const nlohmann::json &response) {
+    auto datas = response["devices"];
+    std::vector<Device> devices;
+    if (!datas.is_null()) {
+        for (auto &data : datas) {
+            Device device;
+            device.id = data.value("id", "");
+            device.is_active = data.value("is_active", false);
+            device.is_private_session = data.value("is_private_session", false);
+            device.is_restricted = data.value("is_restricted", false);
+            device.name = data.value("name", "");
+            device.type = data.value("type", "");
+            device.volume_percent = data.value("volume_percent", 0);
+            device.supports_volume = data.value("supports_volume", false);
+            devices.push_back(std::move(device));
+        }
+    }
+    return devices;
 }
 
 template <>
