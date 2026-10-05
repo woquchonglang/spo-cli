@@ -25,6 +25,17 @@ os: linux (relying heavily on various features of Linux,not support windows and 
 
 <img src=".assets/async.webp" width="200">
 
+# install
+
+```sh 
+yay -S spo-cli
+```
+
+or
+```sh 
+yay -S spo-cli-bin
+```
+
 ## login spotify
 ### api
 [spotify-web-api](https://developer.spotify.com/documentation/web-api)
@@ -48,7 +59,7 @@ login_redirect_uri
 
 ### requirements
 - cmake >= 4.4
-- gcc >= 16.2
+- clang >= 23
 - linux >= 6.1
 - openssl
 - liburing

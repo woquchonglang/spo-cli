@@ -40,6 +40,7 @@ endif()
 
 set(FTXUI_BUILD_MODULES ON)
 set(FTXUI_ENABLE_CCACHE ON)
+set(FTXUI_ENABLE_INSTALL OFF)
 set(TOMLPLUSPLUS_BUILD_MODULES ON)
 set(HTTPLIB_BUILD_MODULES ON)
 set(HTTPLIB_COMPILE ON)
@@ -106,3 +107,7 @@ if(SPOCLI_TEST)
   include(test/test.cmake)
 endif()
 
+# install
+install(TARGETS spo-cli
+        RUNTIME DESTINATION bin
+        COMPONENT spo-cli)
