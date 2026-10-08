@@ -7,6 +7,7 @@ import ftxui;
 import event;
 import spsc;
 import librespot;
+import config.watcher;
 import log;
 import proc;
 
@@ -15,6 +16,21 @@ int main() {
 
     Config config;
     Log::instance().info("config init");
+    ConfigWatcher watcher(config.config_directory, ioc);
+    boost::asio::co_spawn(
+            ioc,
+            [&watcher]() -> boost::asio::awaitable<void> {
+                co_await watcher.watch_inotify();
+            },
+            boost::asio::detached);
+
+    // boost::asio::post(pool, [this]() {
+    //     if (!ctx.has_value()) {
+    //         ctx.emplace(librespot::play_backends());
+    //     }
+    // });
+    Log::instance().info("config watcher init");
+
     boost::asio::co_spawn(
             ioc,
             [&ioc]() -> boost::asio::awaitable<void> {

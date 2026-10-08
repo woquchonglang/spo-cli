@@ -31,6 +31,9 @@ target_compile_options(skyr-url INTERFACE -Wno-deprecated-literal-operator -Wno-
 
 target_include_directories(caches INTERFACE ${CMAKE_SOURCE_DIR}/lib/stb)
 
+target_compile_definitions(tomlplusplus_modules PRIVATE TOML_EXCEPTIONS=0)
+target_compile_options(tomlplusplus_modules PRIVATE -fno-exceptions)
+
 target_link_libraries(
   spo_src PUBLIC ftxui::modules SDBusCpp::sdbus-c++ nlohmann_json_modules httplib
                  tomlplusplus_modules curl ssl crypto concurrentqueue caches
