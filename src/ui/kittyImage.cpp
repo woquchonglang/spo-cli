@@ -1,8 +1,8 @@
 module;
 #include "base64.hpp"
 #include "stb_image.h"
-#include "skyr/url.hpp"
 #include <sys/socket.h>
+#include <boost/url.hpp>
 module kittyImage;
 
 import ftxui;
@@ -25,11 +25,21 @@ KittySupport KittyPrinter::get_kitty_support() {
 static Dimensions get_terminal_size() { return Terminal::Size(); }
 
 std::vector<uint8_t> KittyPrinter::imageUrl2Bytes(std::string_view url) {
-    auto _url = skyr::url(url);
+    auto parsed = boost::urls::parse_uri(url);
+    if (!parsed) {
+        std::cerr << "Invalid URL: " << url << std::endl;
+        return {};
+    }
+    boost::urls::url_view _url = *parsed;
 
     httplib::Client cli(_url.host());
     cli.set_address_family(AF_INET);
-    auto res = cli.Get(_url.pathname());
+
+    std::string path(_url.encoded_path());
+    if (_url.has_query()) {
+        path += "?" + std::string(_url.encoded_query());
+    }
+    auto res = cli.Get(path);
     if (res && res->status == 200) {
         return std::vector<uint8_t>(res->body.begin(), res->body.end());
     } else {
@@ -47,7 +57,8 @@ public:
         std::uniform_int_distribution<> dis(0, 9999);
 
         fs::path temp_dir = fs::temp_directory_path();
-        path_ = temp_dir / (TEMP_FILE_PREFIX + std::to_string(dis(gen)) + ".tmp");
+        path_ = temp_dir /
+                (TEMP_FILE_PREFIX + std::to_string(dis(gen)) + ".tmp");
     }
 
     // https://sw.kovidgoyal.net/kitty/graphics-protocol/#the-transmission-medium
@@ -69,18 +80,22 @@ private:
     std::string TEMP_FILE_PREFIX = "tty-graphics-protocol.spo.";
 };
 
-void KittyPrinter::printToRGBA(const std::vector<uint8_t> &img_data, int img_width, int img_height) {
-    auto rgba = stbi_load_from_memory(img_data.data(), img_data.size(), &img_width, &img_height, nullptr, 4);
+void KittyPrinter::printToRGBA(const std::vector<uint8_t> &img_data,
+                               int img_width, int img_height) {
+    auto rgba = stbi_load_from_memory(img_data.data(), img_data.size(),
+                                      &img_width, &img_height, nullptr, 4);
     std::vector<uint8_t> rgba_data(rgba, rgba + img_width * img_height * 4);
     TempFile temp;
     temp.write(rgba_data);
     std::string base64_path = base64::to_base64(temp.path());
-    std::cout << "\x1b_Gf=32,s=" << img_width << ",v=" << img_height << ",a=T,t=t;" << base64_path << "\x1b\\";
+    std::cout << "\x1b_Gf=32,s=" << img_width << ",v=" << img_height
+              << ",a=T,t=t;" << base64_path << "\x1b\\";
     std::cout.flush();
     stbi_image_free(rgba);
 }
 
-bool parse_response(const std::string &response, int temp_number, int &real_id) {
+bool parse_response(const std::string &response, int temp_number,
+                    int &real_id) {
     std::regex pattern(R"(Gi=(\d+),I=(\d+);)");
     std::smatch matches;
 
@@ -97,40 +112,50 @@ bool parse_response(const std::string &response, int temp_number, int &real_id) 
     return false;
 }
 
-void KittyPrinter::printToRGBA(const std::vector<uint8_t> &img_data, int img_width, int img_height, int x, int y) {
-    auto rgba = stbi_load_from_memory(img_data.data(), img_data.size(), &img_width, &img_height, nullptr, 4);
+void KittyPrinter::printToRGBA(const std::vector<uint8_t> &img_data,
+                               int img_width, int img_height, int x, int y) {
+    auto rgba = stbi_load_from_memory(img_data.data(), img_data.size(),
+                                      &img_width, &img_height, nullptr, 4);
     std::vector<uint8_t> rgba_data(rgba, rgba + img_width * img_height * 4);
     TempFile temp;
     temp.write(rgba_data);
     std::string base64_path = base64::to_base64(temp.path());
-    std::cout << "\x1b_Gf=32,s=" << img_width << ",v=" << img_height << ",w=" << img_width << ",h=" << img_height
-              << ",a=T,t=t;" << base64_path << "\x1b\\";
+    std::cout << "\x1b_Gf=32,s=" << img_width << ",v=" << img_height
+              << ",w=" << img_width << ",h=" << img_height << ",a=T,t=t;"
+              << base64_path << "\x1b\\";
     std::cout.flush();
     stbi_image_free(rgba);
 }
 
-void KittyPrinter::printToRGBAwithCorner(const std::vector<uint8_t> &img_data, int img_width, int img_height,
+void KittyPrinter::printToRGBAwithCorner(const std::vector<uint8_t> &img_data,
+                                         int img_width, int img_height,
                                          int corner) {
-    auto rgba = stbi_load_from_memory(img_data.data(), img_data.size(), &img_width, &img_height, nullptr, 4);
+    auto rgba = stbi_load_from_memory(img_data.data(), img_data.size(),
+                                      &img_width, &img_height, nullptr, 4);
     std::vector<uint8_t> rgba_data(rgba, rgba + img_width * img_height * 4);
     add_rounded_corners_rgba(rgba_data.data(), img_width, img_height, corner);
     TempFile temp;
     temp.write(rgba_data);
     std::string base64_path = base64::to_base64(temp.path());
-    std::cout << "\x1b_Gf=32,s=" << img_width << ",v=" << img_height << ",w=" << img_width << ",h=" << img_height
-              << ",a=T,t=t;" << base64_path << "\x1b\\";
+    std::cout << "\x1b_Gf=32,s=" << img_width << ",v=" << img_height
+              << ",w=" << img_width << ",h=" << img_height << ",a=T,t=t;"
+              << base64_path << "\x1b\\";
     std::cout.flush();
     stbi_image_free(rgba);
 }
 
-int KittyPrinter::printToRGBAwithID(const std::vector<uint8_t> &img_data, int img_width, int img_height, int x, int y) {
-    auto rgba = stbi_load_from_memory(img_data.data(), img_data.size(), &img_width, &img_height, nullptr, 4);
+int KittyPrinter::printToRGBAwithID(const std::vector<uint8_t> &img_data,
+                                    int img_width, int img_height, int x,
+                                    int y) {
+    auto rgba = stbi_load_from_memory(img_data.data(), img_data.size(),
+                                      &img_width, &img_height, nullptr, 4);
     std::vector<uint8_t> rgba_data(rgba, rgba + img_width * img_height * 4);
     TempFile temp;
     temp.write(rgba_data);
     std::string base64_path = base64::to_base64(temp.path());
-    std::cout << "\x1b_Gf=32,s=" << img_width << ",v=" << img_height << ",x=" << x << ",y=" << y << ",I=" << numbers++
-              << ",a=T,t=t;" << base64_path << "\x1b\\";
+    std::cout << "\x1b_Gf=32,s=" << img_width << ",v=" << img_height
+              << ",x=" << x << ",y=" << y << ",I=" << numbers++ << ",a=T,t=t;"
+              << base64_path << "\x1b\\";
     std::cout.flush();
     std::string response;
     char ch;
@@ -138,7 +163,8 @@ int KittyPrinter::printToRGBAwithID(const std::vector<uint8_t> &img_data, int im
     while (1) {
         if (std::cin.get(ch)) {
             response += ch;
-            if (response.size() >= 2 && response[response.size() - 2] == '\x1b' &&
+            if (response.size() >= 2 &&
+                response[response.size() - 2] == '\x1b' &&
                 response[response.size() - 1] == '\\') {
                 parse_response(response, numbers, id);
                 break;
@@ -182,11 +208,13 @@ KittyImage::KittyImage(int width, int height, std::string_view url) {
     data_ = KittyPrinter::imageUrl2Bytes(url);
 }
 
-void KittyPrinter::add_rounded_corners_rgba(unsigned char *data, int width, int height, int radius) {
+void KittyPrinter::add_rounded_corners_rgba(unsigned char *data, int width,
+                                            int height, int radius) {
     for (int y = 0; y < height; ++y) {
         for (int x = 0; x < width; ++x) {
             if (is_in_corner(x, y, width, height, radius)) {
-                float alpha = calculate_corner_alpha(x, y, width, height, radius);
+                float alpha =
+                        calculate_corner_alpha(x, y, width, height, radius);
                 int idx = (y * width + x) * 4;
                 data[idx + 3] = (unsigned char)(alpha * 255);
             }
@@ -205,7 +233,8 @@ bool KittyPrinter::is_in_corner(int x, int y, int w, int h, int r) {
         return (x - r) * (x - r) + (y - (h - r)) * (y - (h - r)) > r * r;
     }
     if (x > w - r && y > h - r) {
-        return (x - (w - r)) * (x - (w - r)) + (y - (h - r)) * (y - (h - r)) > r * r;
+        return (x - (w - r)) * (x - (w - r)) + (y - (h - r)) * (y - (h - r)) >
+               r * r;
     }
     return false;
 }

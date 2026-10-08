@@ -46,8 +46,6 @@ set(HTTPLIB_BUILD_MODULES ON)
 set(HTTPLIB_COMPILE ON)
 set(NLOHMANN_JSON_BUILD_MODULES ON CACHE BOOL "Enable nlohmann.json module support")
 set(BASE64_ENABLE_TESTING OFF)
-set(skyr_BUILD_TESTS OFF)
-set(skyr_ENABLE_JSON_FUNCTIONS OFF)
 set(SPDLOG_USE_STD_FORMAT ON)
 
 add_subdirectory(lib/nlohmann-json)
@@ -56,10 +54,8 @@ add_subdirectory(lib/ftxui)
 add_subdirectory(lib/cpp-httplib)
 add_subdirectory(lib/concurrentqueue)
 add_subdirectory(lib/readerwriterqueue)
-add_subdirectory(lib/url)
 add_subdirectory(lib/base64)
 add_subdirectory(lib/librespot-cpp)
-add_subdirectory(lib/cava)
 add_subdirectory(lib/spdlog)
 
 add_compile_definitions(BOOST_ASIO_HAS_IO_URING)
@@ -91,9 +87,6 @@ else ()
 endif ()
 
 set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES CXX_MODULE_STD ON)
-
-# target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE -freflection)
-
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
    set_property(TARGET ${CMAKE_PROJECT_NAME} PROPERTY

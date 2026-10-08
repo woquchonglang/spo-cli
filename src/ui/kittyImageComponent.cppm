@@ -2,22 +2,23 @@ module;
 export module kittyImageComponent;
 
 import ftxui;
-import spotifyWebAPI;
+import spotify_data;
 import std;
 
 using namespace ftxui;
 
 export class KittyImageComponent : public ftxui::ComponentBase {
 public:
-    KittyImageComponent(std::shared_ptr<SpotifyData> data) : data_(data) {}
+    KittyImageComponent(const ::Image &data) : data(data) {}
 
     Element OnRender() override;
+    void clear();
 
 private:
 private:
     Box box_;
-    std::shared_ptr<SpotifyData> data_;
+    const ::Image &data;
     bool render{ false };
 };
 
-export Component image_view(std::shared_ptr<SpotifyData> data);
+export Component image_view(const ::Image &data);

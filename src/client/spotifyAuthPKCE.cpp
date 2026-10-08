@@ -9,7 +9,6 @@ module;
 #include <boost/asio/ssl.hpp>
 #include <boost/beast.hpp>
 #include <boost/beast/ssl.hpp>
-#include <skyr/url.hpp>
 module spotifyAuthPKCE;
 
 import http.client;
