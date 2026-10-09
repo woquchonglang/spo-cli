@@ -8,7 +8,7 @@ Log::Log() {
     spdlog::init_thread_pool(8192, 1);
     logger = spdlog::basic_logger_mt<spdlog::async_factory>("async_file_logger",
                                                             "log", true);
-    logger->set_pattern("[%H:%M:%S] [%t] [%^%l%$] %v");
+    logger->set_pattern("[%H:%M:%S.%e] [%^%l%$] %v");
     logger->set_level(spdlog::level::debug);
     this->info("log init");
     logger->flush_on(spdlog::level::trace);

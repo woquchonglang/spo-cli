@@ -25,7 +25,7 @@ os: linux (relying heavily on various features of Linux,not support windows and 
 
 <img src=".assets/async.webp" width="200">
 
-# install
+# Install
 
 ```sh 
 yay -S spo-cli
@@ -36,7 +36,7 @@ or
 yay -S spo-cli-bin
 ```
 
-## login spotify
+## Login spotify
 ### api
 [spotify-web-api](https://developer.spotify.com/documentation/web-api)
 
@@ -76,13 +76,19 @@ ninja -C build
 ./build/spo-cli
 ```
 
-### test
+### Test
 ```cmake
 option(SPOCLI_TEST ON)
 ```
 
 ```sh
 ./build/spo-test
+```
+
+### Install
+
+```
+cmake --install build --component spo-cli --prefix ~/.local
 ```
 
 

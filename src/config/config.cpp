@@ -1,16 +1,41 @@
 module;
+#include <stdlib.h>
 module config;
 
-using namespace std::literals;
+import ftxui;
+import config.defaults;
+
+using namespace std::literals; // for ""sv
 
 Config::Config() {
-    config_directory = std::filesystem::path("config");
-    config_path = config_directory + "/default.toml";
-    auto new_config = parse(config_path);
-    if (new_config.has_value()) {
-        data.write().value = std::move(new_config.value());
+    // current project test
+    config_directory = std::filesystem::path(".config");
+    config_path = config_directory / "spocli.toml";
+    if (fs::exists(config_path)) {
+        auto new_config = parse(config_path.string());
+        if (new_config.has_value()) {
+            data.write().value = std::move(new_config.value());
+            return;
+        }
+    }
+
+    // application config path
+    config_directory = std::filesystem::path(getenv("HOME")) / ".config";
+    if (!fs::exists(config_directory)) {
+        std::filesystem::create_directories(config_directory.parent_path());
+    }
+
+    config_path = config_directory / "spo-cli" / "spocli.toml";
+    if (std::filesystem::exists(config_path)) {
+        auto user_config = parse(config_path.string());
+        if (user_config.has_value()) {
+            data.write().value = std::move(user_config.value());
+            return;
+        }
     } else {
-        std::cerr << "Failed to load config from " << config_path << std::endl;
+        DefaultConfig default_config(config_path);
+        data.write().value = std::move(default_config.get());
+        return;
     }
 }
 
@@ -28,7 +53,6 @@ std::optional<ConfigData> Config::parse(std::string_view config_path) {
     ConfigData cfg;
 
     cfg.client_id = config["spotify"]["client_id"].value_or(""sv);
-    cfg.client_secret = config["spotify"]["client_secret"].value_or(""sv);
     cfg.login_redirect_url =
             config["spotify"]["login_redirect_url"].value_or(""sv);
     cfg.soloist_api_key = config["soloist"]["api_key"].value_or(""sv);
@@ -59,7 +83,7 @@ std::optional<ConfigData> Config::parse(std::string_view config_path) {
 }
 
 void Config::refresh() {
-    auto new_config = parse(config_path);
+    auto new_config = parse(config_path.string());
     if (new_config.has_value()) {
         data.write().value = std::move(new_config.value());
     } else {

@@ -37,7 +37,7 @@ target_link_libraries(
   spo_src PUBLIC ftxui::modules SDBusCpp::sdbus-c++ nlohmann_json_modules httplib
                  tomlplusplus_modules curl ssl crypto concurrentqueue caches
                  Boost::url base64 uring librespot-cpp readerwriterqueue
-                 fmt spdlog fftw3 cava)
+                 fmt spdlog fftw3 cava reflectcpp)
 
 # version
 execute_process(

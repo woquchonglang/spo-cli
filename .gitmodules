@@ -43,3 +43,6 @@
 [submodule "lib/spdlog"]
 	path = lib/spdlog
 	url = https://github.com/gabime/spdlog.git
+[submodule "lib/reflect-cpp"]
+	path = lib/reflect-cpp
+	url = https://github.com/getml/reflect-cpp.git
