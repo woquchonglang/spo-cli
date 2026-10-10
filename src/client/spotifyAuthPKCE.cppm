@@ -7,11 +7,6 @@ import config;
 import std;
 import nlohmann.json;
 
-static constexpr std::string_view SPOTIFY_CLIENT_ID =
-        "65b708073fc0480ea92a077233ca87bd";
-static constexpr std::string_view NCSPOT_CLIENT_ID =
-        "d420a117a32841c2b3474932e49fb54b";
-
 std::vector<std::string> scopes = {
     // Images
     "ugc-image-upload",

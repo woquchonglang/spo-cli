@@ -205,6 +205,16 @@ boost::asio::awaitable<bool> SpotifyAuthPKCE::login() {
                     },
                     boost::asio::detached);
             co_return true;
+        } else {
+            this->refresh_token = cache.value().refresh_token;
+            co_await refreshAccessToken();
+            boost::asio::co_spawn(
+                    ioc,
+                    [this]() -> boost::asio::awaitable<void> {
+                        co_await startRefreshTimer();
+                    },
+                    boost::asio::detached);
+            co_return true;
         }
     }
 
