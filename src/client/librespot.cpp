@@ -4,6 +4,7 @@ module;
 #include "librespot.rs.h"
 module librespot;
 
+import event;
 struct Librespot::Impl {
     rust::Box<librespot::SpotifyContext> ctx;
     Impl() : ctx(librespot::play_backends()) {}
@@ -30,3 +31,7 @@ void Librespot::update_lyrics() {
 }
 
 void Librespot::stop() { librespot::cancel_play_backends(); }
+
+extern "C" void cpp_get_player_event_channel_cb() {
+    eventQueue.enqueue(SPOCLI::Event::GetCurrentlyPlayingTrack);
+}

@@ -1,5 +1,5 @@
 use librespot::{
-    connect::{ConnectConfig, LoadRequest, LoadRequestOptions, Spirc},
+    connect::{ConnectConfig, Spirc},
     core::{
         Error, authentication::Credentials, cache::Cache, config::SessionConfig, session::Session,
     },
@@ -11,7 +11,7 @@ use librespot::{
         convert::Converter,
         decoder::AudioPacket,
         mixer,
-        player::Player,
+        player::{Player, PlayerEvent},
     },
 };
 
@@ -138,6 +138,10 @@ impl From<librespot_metadata::lyrics::Lyrics> for Lyrics {
     }
 }
 
+unsafe extern "C" {
+    fn cpp_get_player_event_channel_cb();
+}
+
 const CACHE: &str = ".cache";
 const CACHE_FILES: &str = ".cache/files";
 
@@ -155,7 +159,6 @@ fn play_backends() -> Box<SpotifyContext> {
             let audio_format = AudioFormat::default();
             let connect_config = ConnectConfig::default();
             let mixer_config = MixerConfig::default();
-            let request_options = LoadRequestOptions::default();
 
             let sink_builder = audio_backend::find(None).unwrap();
             let mixer_builder = mixer::find(None).unwrap();
@@ -180,7 +183,6 @@ fn play_backends() -> Box<SpotifyContext> {
 
             let session = Session::new(session_config, Some(cache));
             let mixer = mixer_builder(mixer_config).expect("mixer error");
-            mixer.set_volume(65535);
 
             let player = Player::new(
                 player_config,
@@ -193,31 +195,36 @@ fn play_backends() -> Box<SpotifyContext> {
                 },
             );
 
+            let player_event_task = tokio::task::spawn({
+                let mut channel = player.get_player_event_channel();
+                async move {
+                    while let Some(event) = channel.recv().await {
+                        eprintln!("got event: {:?}", event);
+                        match event {
+                            PlayerEvent::Playing { .. }
+                            | PlayerEvent::Paused { .. }
+                            | PlayerEvent::EndOfTrack { .. }
+                            | PlayerEvent::TrackChanged { .. } => unsafe {
+                                cpp_get_player_event_channel_cb();
+                            },
+                            _ => {}
+                        }
+                    }
+                }
+            });
+
             let (spirc, spirc_task) =
                 Spirc::new(connect_config, session.clone(), credentials, player, mixer)
                     .await
                     .expect("spirc error");
 
-            // these calls can be seen as "queued"
-            // spirc.activate().expect("spirc activate error");
-            // spirc
-            //     .load(LoadRequest::from_context_uri(
-            //         format!("spotify:user:{}:collection", session.username()),
-            //         request_options,
-            //     ))
-            //     .expect("spirc load error");
-            // spirc.play().expect("spirc play error");
-
             // starting the connect device and processing the previously "queued" calls
             tokio::spawn(async move {
                 let _spirc = spirc;
                 tokio::select! {
-                    _ = spirc_task => {
-                        eprintln!("spirc task ended");
-                    }
-                    _ = CANCEL.notified() => {
-                        eprintln!("cancel signal received, stopping spirc");
-                    }
+                    _ = spirc_task => {}
+                    _ = player_event_task => {}
+                    _ = CANCEL.notified() => {}
                 }
             });
 
@@ -230,11 +237,18 @@ fn get_lyrics_lines(ctx: &SpotifyContext, id: &str) -> Result<Vec<ffi::LyricLine
     runtime().block_on(async {
         let spotify_id = SpotifyId::from_base62(id).map_err(|e| format!("Invalid ID: {e}"))?;
 
-        let raw = futures::executor::block_on(librespot_metadata::lyrics::Lyrics::get(
-            &ctx.session,
-            &spotify_id,
-        ))
-        .map_err(|e| format!("Error: {e}"))?;
+        let raw = librespot_metadata::lyrics::Lyrics::get(&ctx.session, &spotify_id).await;
+
+        let raw = match raw {
+            Ok(r) => r,
+            Err(e) => {
+                let msg = e.to_string();
+                if msg.contains("404") {
+                    return Ok(Vec::new());
+                }
+                return Err(format!("Error: {msg}"));
+            }
+        };
 
         let local: Lyrics = raw.into();
 
