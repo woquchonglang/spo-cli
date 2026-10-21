@@ -5,11 +5,10 @@ module ui;
 import ftxui;
 import mpmc;
 import std;
-import kittyImageComponent;
-import spotifyWebAPI;
 import event;
 import proc;
 import :visualizer;
+import :progressGuage;
 Ui::Ui(Config &config, SpotifyData &spotifyData)
         : screen(App::FullscreenAlternateScreen())
         , config(config)
@@ -274,6 +273,51 @@ ftxui::Element Ui::render_cava() {
                       hbox({ filler(), proc_info->Render() }) });
     });
 
+
+void Ui::render_current_playing_song() {
+    static bool request_currently_playing_track = false;
+    current_playing_song = Renderer([this]() -> Element {
+        auto guard2 = spotifyData.currentlyPlayTrack.read();
+
+        if (guard2.value.currently_playing.duration_ms != 0) {
+            std::string isPlaying = guard2.value.isPlaying ? "playing" : "stop";
+            auto progress_ms = spotifyData.playback_progress();
+            return vbox(
+                    { render_cava() | flex,
+                      text(isPlaying + ": " +
+                           guard2.value.currently_playing.name + " " +
+                           guard2.value.currently_playing.atrists_name[0] +
+                           "[" + Time::format_duration(progress_ms) + "/" +
+                           Time::format_duration(
+                                   guard2.value.currently_playing.duration_ms) +
+                           "]"),
+                      hbox({
+                              progressGaugeCharset(
+                                      ((float)progress_ms /
+                                       guard2.value.currently_playing
+                                               .duration_ms),
+                                      { "─", "━" },
+                                      config.data.read()->theme.progressline_fg,
+                                      config.data.read()->theme.progressline_bg) |
+                                      size(WIDTH, EQUAL, 60),
+                      }) });
+        } else {
+            if (request_currently_playing_track == false) {
+                eventQueue.enqueue(SPOCLI::Event::GetCurrentlyPlayingTrack);
+                request_currently_playing_track = true;
+            }
+            return vbox(
+                    { text("no play"),
+                      hbox({
+                              progressGaugeCharset(
+                                      0, { "—", "━" },
+                                      config.data.read()->theme.progressline_fg,
+                                      config.data.read()->theme.progressline_bg) |
+                                      size(WIDTH, EQUAL, 60),
+                      }) });
+        }
+    });
+}
 
     renderer |= CatchEvent([&](Event event) {
         if (event == Event::q || event == Event::CtrlC) {

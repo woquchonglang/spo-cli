@@ -20,6 +20,9 @@ public:
     asio::awaitable<void> renderLogin();
 
     Element render_cava();
+    void render_curlyrics();
 private:
     App screen = App::FullscreenAlternateScreen();
+    Component curlyrics;
+    Component current_playing_song;
 };
