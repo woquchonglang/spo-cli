@@ -25,6 +25,7 @@ target_include_directories(caches INTERFACE ${CMAKE_SOURCE_DIR}/lib/caches/inclu
 
 add_library(stb INTERFACE)
 add_compile_definitions(STB_IMAGE_IMPLEMENTATION)
+add_compile_definitions(STB_IMAGE_RESIZE_IMPLEMENTATION)
 
 add_library(cava STATIC ${CMAKE_SOURCE_DIR}/lib/cava/cavacore.c)
 target_include_directories(cava PUBLIC ${CMAKE_SOURCE_DIR}/lib/cava)

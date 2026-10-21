@@ -21,8 +21,13 @@ public:
 
     Element render_cava();
     void render_curlyrics();
+    void render_image();
 private:
     App screen = App::FullscreenAlternateScreen();
     Component curlyrics;
     Component current_playing_song;
+    bool image_show = true;
+    bool image_rendered = false;
+    Component image_box;
+    SpotifyData &spotifyData;
 };

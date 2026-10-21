@@ -10,6 +10,7 @@ import proc;
 import :visualizer;
 import :progressGuage;
 import :cover;
+import :kittyImageComponent;
 Ui::Ui(Config &config, SpotifyData &spotifyData)
         : screen(App::FullscreenAlternateScreen())
         , config(config)
@@ -334,6 +335,67 @@ void Ui::render_current_playing_song() {
     });
 
 
+const std::vector<::Image> &Ui::get_current_image() {
+    if (last_term_size != term_size) {
+        image_rendered = false;
+        last_term_size = term_size;
+    }
+    if (term_size == TermSize::Large) {
+        return spotifyData.currentlyPlayTrack.read()
+                .value.currently_playing.image.largeImage;
+    } else if (term_size == TermSize::Medium) {
+        return spotifyData.currentlyPlayTrack.read()
+                .value.currently_playing.image.mediumImage;
+    } else {
+        return spotifyData.currentlyPlayTrack.read()
+                .value.currently_playing.image.smallImage;
+    }
+}
+
+void Ui::render_image() {
+    static Component image_component_;
+    image_box = Renderer([&]() -> Element {
+        const std::vector<::Image> &image = get_current_image();
+        if (image.empty()) {
+            return emptyElement();
+        } else if (!image_rendered) {
+            Log::instance().info("image size: {}x{}", image[0].width,
+                                 image[0].height);
+            image_component_ = image_view(image[0]);
+            image_rendered = true;
+
+            //TODO: update theme if select following theme
+            if (theme_manager.follow_picker) {
+                theme_manager.update(image[0]);
+                auto _data = *config.data.read();
+                Color color = Color::RGBA(theme_manager.palette.colors[0].r,
+                                          theme_manager.palette.colors[0].g,
+                                          theme_manager.palette.colors[0].b,
+                                          255);
+                _data.theme.lyrics_fg = color;
+                config.data.write(std::make_shared<ConfigData>(_data));
+            }
+        }
+        return image_component_->Render();
+    });
+}
+
+void Ui::render_notify() {
+    notify_section = Renderer([&]() -> Element {
+        if (auto msg = config.notify_msg.read(); msg && !msg->empty()) {
+            notify_msg.push_back(*msg);
+        }
+        if (!notify_msg.empty()) {
+            auto left_bar = separatorLight() | color(Color::Red);
+            auto content = text(notify_msg[0]) | flex;
+            auto element = hbox({
+                    left_bar,
+                    content,
+            });
+            return element;
+        }
+        return emptyElement();
+    });
 }
 
 
