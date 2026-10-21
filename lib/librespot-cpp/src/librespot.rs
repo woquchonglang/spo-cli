@@ -139,7 +139,10 @@ impl From<librespot_metadata::lyrics::Lyrics> for Lyrics {
 }
 
 unsafe extern "C" {
-    fn cpp_get_player_event_channel_cb();
+    fn cpp_player_event_playing_cb();
+    fn cpp_player_event_pause_cb();
+    fn cpp_player_event_endOfTrack_cb();
+    fn cpp_player_event_trackChanged_cb();
 }
 
 const CACHE: &str = ".cache";
@@ -201,11 +204,17 @@ fn play_backends() -> Box<SpotifyContext> {
                     while let Some(event) = channel.recv().await {
                         eprintln!("got event: {:?}", event);
                         match event {
-                            PlayerEvent::Playing { .. }
-                            | PlayerEvent::Paused { .. }
-                            | PlayerEvent::EndOfTrack { .. }
-                            | PlayerEvent::TrackChanged { .. } => unsafe {
-                                cpp_get_player_event_channel_cb();
+                            PlayerEvent::Playing { .. } => unsafe {
+                                cpp_player_event_playing_cb();
+                            },
+                            PlayerEvent::Paused { .. } => unsafe {
+                                cpp_player_event_pause_cb();
+                            },
+                            PlayerEvent::EndOfTrack { .. } => unsafe {
+                                cpp_player_event_endOfTrack_cb();
+                            },
+                            PlayerEvent::TrackChanged { .. } => unsafe {
+                                cpp_player_event_trackChanged_cb();
                             },
                             _ => {}
                         }

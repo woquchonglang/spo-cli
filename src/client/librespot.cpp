@@ -2,8 +2,10 @@ module;
 #include "librespot.rs.h"
 module spotify;
 
+import log;
 import utils.threadTool;
 import event;
+
 
 struct Librespot::Impl {
     std::optional<rust::Box<librespot::SpotifyContext>> ctx;
@@ -58,6 +60,18 @@ void Librespot::update_lyrics() {
 
 void Librespot::stop() { librespot::cancel_play_backends(); }
 
-extern "C" void cpp_get_player_event_channel_cb() {
+extern "C" void cpp_player_event_playing_cb() {
     eventQueue.enqueue(SPOCLI::Event::GetCurrentlyPlayingTrack);
+}
+
+extern "C" void cpp_player_event_pause_cb() {
+    eventQueue.enqueue(SPOCLI::Event::GetCurrentlyPlayingTrack);
+}
+
+extern "C" void cpp_player_event_endOfTrack_cb() {
+    eventQueue.enqueue(SPOCLI::Event::GetCurrentlyPlayingTrack);
+}
+
+extern "C" void cpp_player_event_trackChanged_cb() {
+    eventQueue.enqueue(SPOCLI::Event::NextTrack);
 }
