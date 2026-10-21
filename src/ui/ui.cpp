@@ -7,17 +7,38 @@ import mpmc;
 import std;
 import event;
 import proc;
+import time;
+import log;
 import :visualizer;
 import :progressGuage;
 import :cover;
 import :kittyImageComponent;
+import magic_enum;
+
 Ui::Ui(Config &config, SpotifyData &spotifyData)
         : screen(App::FullscreenAlternateScreen())
         , config(config)
         , spotifyData(spotifyData) {
+    quirks = Terminal::GetQuirks();
+    term_emulator_name = screen.TerminalEmulatorName();
+    term_emulator_version = screen.TerminalEmulatorVersion();
     g_visualizer = std::make_unique<Visualizer>();
     g_visualizer->register_cb();
+    if (config.data.read()->preset == "follow") {
+    }
+    reConfig();
+    render_help();
+    render_curlyrics();
+    render_username();
+    render_current_playing_song();
+    render_search();
+    render_image();
+    render_notify();
+}
 
+asio::awaitable<void> Ui::renderLogin() {
+    Log::instance().info("renderLogin init");
+    eventQueue.enqueue(SPOCLI::Event::Login);
 
     auto cover = Renderer([&] {
         auto c = Canvas(80, 20);
@@ -42,6 +63,7 @@ Ui::Ui(Config &config, SpotifyData &spotifyData)
 
     login |= CatchEvent([&](Event event) {
         if (event == Event::q || event == Event::CtrlC) {
+            main_show = false;
             screen.Exit();
             eventQueue.enqueue(SPOCLI::Event::Exit);
             return true;
@@ -66,110 +88,210 @@ Ui::Ui(Config &config, SpotifyData &spotifyData)
 
 
 asio::awaitable<void> Ui::render() {
+    std::vector<std::string> main_entries = {
+        "Top Artists",     "Top Tracks",  "Playlists",  "Followed Playlists",
+        "FollowedArtists", "SavedAlbums", "SavedShows", "SavedTracks"
     };
-    int selected = 0;
 
-    MenuOption option;
-    // option.on_enter = screen.ExitLoopClosure();
-    auto menu = Menu(&entries, &selected, option);
+    int main_selected = 0;
+
+    // int userTopTracksSelected = 0;
+    // MenuOption userTopTracksOption;
+    // userTopTracksOption.on_enter = [&userTopTracksSelected, &spotifyData] {
+    //     auto guard = spotifyData.topTracks.read();
+    //     auto uri = guard.value.uri[userTopTracksSelected];
+    //     play_song_spsc.enqueue(uri);
+    // };
+    //
+    // auto userTopTracksMenu = [&]() -> Component {
+    //     auto guard = spotifyData.topTracks.read();
+    //     return Menu(&guard.value.tracks, &userTopTracksSelected,
+    //                 userTopTracksOption);
+    // }();
+
+    // auto userTopTracksMenu =
+    //         Renderer(userTopTracksMenuComponent, [&]() -> Element {
+    //             auto guard = spotifyData.topTracks.read();
+    //             if (guard.value.tracks.size() > 0) {
+    //                 return userTopTracksMenuComponent->Render();
+    //             } else {
+    //                 eventQueue.enqueue(SPOCLI::Event::GetUserTopTracks);
+    //                 return text("Loading...") | center;
+    //             }
+    //         });
 
 
-    // auto userProfile = Renderer([&] {
-    //     if (spotifyData.userProfile.read().value.has_value()) {
-    //         return text("name: " + spotifyData.userProfile.read().value->displayName + "\n" +
-    //                     "email: " + spotifyData.userProfile.read().value->email +
-    //                     "\n"
-    //                     "product: " +
-    //                     spotifyData.userProfile.read().value->product);
-    //     } else {
-    //         queue.enqueue(SPOCLI::Event::GetUserProfile);
-    //         return text("Loading...");
+    // std::vector<Component> sub_menus;
+    // std::vector<Component> sub_sub_menus;
+    // std::vector<int> sub_sub_selected;
+    // std::vector<bool> sub_sub_loaded;
+    //
+    // MenuOption topTracks_opt;
+    // topTracks_opt.on_enter = [&sub_selected, &spotifyData] {
+    //     auto idx = sub_selected[1];
+    //     auto guard = spotifyData.topTracks.read();
+    //     auto uri = guard.value.uri[idx];
+    //     play_song_spsc.enqueue(uri);
+    // };
+    //
+    // MenuOption playlists_opt;
+    // playlists_opt.on_enter = [&sub_selected, &spotifyData] {
+    //     auto idx = sub_selected[2];
+    //     auto guard = spotifyData.userPlaylists.read();
+    //     auto item = guard.value.items[idx];
+    //     playlistItems_spsc.enqueue(item);
+    // };
+    //
+    // // top artists
+    // sub_menus.push_back(
+    //         Menu(&spotifyData.topArtists.read().value.names, &sub_selected[0]));
+    //
+    // // top tracks
+    // sub_menus.push_back(Menu(&spotifyData.topTracks.read().value.tracks,
+    //                          &sub_selected[1], topTracks_opt));
+    //
+    // // user playlist
+    // sub_menus.push_back(Menu(&spotifyData.userPlaylists.read().value.items,
+    //                          &sub_selected[2]));
+    //
+    // for (int i = 3; i < 8; ++i) {
+    //     sub_menus.push_back(Menu(&sub_entries[i], &sub_selected[i]));
+    // }
+    //
+    MenuOption main_opt;
+    main_opt.on_enter = [&] {
+        int idx = main_selected;
+        switch (idx) {
+        case 0:
+            eventQueue.enqueue(SPOCLI::Event::GetUserTopArtists);
+            break;
+        case 1:
+            eventQueue.enqueue(SPOCLI::Event::GetUserTopTracks);
+            break;
+        case 2:
+            eventQueue.enqueue(SPOCLI::Event::GetUserPlaylists);
+            break;
+        }
+    };
+    auto main_menu = Menu(&main_entries, &main_selected, main_opt);
+
+    // container |= CatchEvent([&](Event event) {
+    //     if (event == Event::r || event == Event::Escape) {
+    //         return true;
     //     }
+    //     return false;
     // });
 
-    auto userProfile = Renderer([&] {
-        return text(
-                "name: " + spotifyData.userProfile.read().value.displayName +
-                "\n" + "email: " + spotifyData.userProfile.read().value.email +
-                "\n"
-                "product: " +
-                spotifyData.userProfile.read().value.product);
-    });
+    auto search_and_user_name = user_name | Modal(search_section, &search_show);
 
-    auto userProfileLoading = Renderer([&] {
-        queue.enqueue(SPOCLI::Event::GetUserProfile);
-        return text("Loading...") | size(WIDTH, EQUAL, 36);
-    });
+    auto container = Container::Vertical(
+            { search_and_user_name, Renderer([] { return separator(); }),
+              main_menu | vscroll_indicator | frame | size(HEIGHT, EQUAL, 8) |
+                      size(WIDTH, EQUAL, 40) });
 
-    auto userTopArtistsTitle = Renderer([&] { return text("Top Artists"); });
+    auto container_wrapper = container | Modal(help_section, &help_show);
 
-    // auto userTopArtists = Renderer([&] {
-    //     Elements children = {};
-    //     for (auto i : spotifyData.topArtists.read().value->names) {
-    //         children.push_back(text(i));
-    //     }
-    //     return vbox(children);
-    // });
-
-    auto userTopArtistsLoading = Renderer([&] {
-        queue.enqueue(SPOCLI::Event::GetUserTopArtists);
-        return text("Loading...");
-    });
-
-    MenuOption userTopArtistsOption;
-    int userTopArtistsSelected = 0;
-    auto userTopArtistsMenu = [&]() -> Component {
-        auto guard = spotifyData.topArtists.read();
-        return Menu(&guard.value.names, &userTopArtistsSelected,
-                    userTopArtistsOption);
-    }();
-
-    MenuOption userTopTracksOption;
-    userTopTracksOption.on_enter = [&] {
-        // if (spotifyData.topTracks.read().value.tracks.size() > 0) {
-        //     queue.enqueue(SPOCLI::Event::PlayTrack(spotifyData.topTracks.read().value.uri[userTopTracksSelected]));
-        // }
-    };
-    int userTopTracksSelected = 0;
-    auto userTopTracksMenuComponent = [&]() -> Component {
-        auto guard = spotifyData.topTracks.read();
-        return Menu(&guard.value.tracks, &userTopArtistsSelected,
-                    userTopArtistsOption);
-    }();
-
-    auto userTopTracksMenu =
-            Renderer(userTopTracksMenuComponent, [&]() -> Element {
-                auto guard = spotifyData.topTracks.read();
-                if (guard.value.tracks.size() > 0) {
-                    return userTopTracksMenuComponent->Render();
-                } else {
-                    queue.enqueue(SPOCLI::Event::GetUserTopTracks);
-                    return text("Loading...") | center;
-                }
-            });
-
-    auto user_Profile = Renderer([&] {
-        Elements children = {};
-        auto guard = spotifyData.userProfile.read();
-        if (guard.value.account_id != "") {
-            children.push_back(userProfile->Render());
+    // main ui
+    auto renderer = Renderer(container_wrapper, [&] {
+        Element image_lycics_com;
+        if (term_direction == TermDirection::Horizontal) {
+            image_lycics_com =
+                    hbox({ image_box->Render(),
+                           separatorEmpty() | size(WIDTH, EQUAL, 6),
+                           vbox({
+                                   filler(),
+                                   curlyrics->Render() | size(WIDTH, EQUAL, 40),
+                                   filler(),
+                           }) }) |
+                    center;
         } else {
-            children.push_back(userProfileLoading->Render());
+            image_lycics_com =
+                    vbox({ image_box->Render(),
+                           separatorEmpty() | size(HEIGHT, EQUAL, 6),
+                           vbox({
+                                   filler(),
+                                   curlyrics->Render() | size(WIDTH, EQUAL, 40),
+                                   filler(),
+                           }) }) |
+                    center;
         }
-        children.push_back(separatorEmpty());
-        children.push_back(userTopArtistsTitle->Render());
-        children.push_back(separator());
-        if (spotifyData.topArtists.read().value.names.size() == 0) {
-            queue.enqueue(SPOCLI::Event::GetUserTopArtists);
+        return vbox({ notify_section->Render() | align_right, filler(),
+                      // container_wrapper->Render() | center,
+                      image_lycics_com, filler(),
+                      current_playing_song->Render() | center,
+                      hbox({ filler(), proc_section->Render() }) });
+    });
+
+    renderer |= CatchEvent([&](Event event) {
+        if (event == Event::q || event == Event::CtrlC) {
+            main_show = false;
+            eventQueue.enqueue(SPOCLI::Event::Exit);
+            return true;
+        } else if (event == Event::Character('?')) {
+            help_show = !help_show;
+            return true;
+        } else if (event == Event::Character(' ')) {
+            auto guard2 = spotifyData.currentlyPlayTrack.read();
+            if (guard2.value.isPlaying == true) {
+                eventQueue.enqueue(SPOCLI::Event::Pause);
+                return true;
+            } else {
+                eventQueue.enqueue(SPOCLI::Event::Play);
+                return true;
+            }
+        } else if (event == Event::Character('/')) {
+            search_show = !search_show;
+            return true;
+        } else if (event == Event::ArrowRight) {
+            eventQueue.enqueue(SPOCLI::Event::SeekRight);
+            return true;
+        } else if (event == Event::ArrowLeft) {
+            eventQueue.enqueue(SPOCLI::Event::SeekLeft);
+            return true;
+        } else if (event == Event::Character('[')) {
+            eventQueue.enqueue(SPOCLI::Event::SkipToPrevious);
+            return true;
+        } else if (event == Event::Character(']')) {
+            eventQueue.enqueue(SPOCLI::Event::SkipToNext);
+            return true;
+        } else if (event == Event::Character('-')) {
+            eventQueue.enqueue(SPOCLI::Event::SetVolumeDown);
+            return true;
+        } else if (event == Event::Character('=')) {
+            eventQueue.enqueue(SPOCLI::Event::SetVolumeUp);
+            return true;
+        } else if (event == Event::Character('s')) {
+            eventQueue.enqueue(SPOCLI::Event::Set_shuffle);
+            return true;
+        } else if (event == Event::Character('R')) {
+            eventQueue.enqueue(SPOCLI::Event::Set_repeat_track);
+            return true;
+        } else if (event == Event::Event::i) {
+            image_show = !image_show;
+            return true;
+        } else if (event == Event_ReConfig) {
+            reConfig();
+            return true;
+        } else if (event == Event_NextTrack) {
+            image_rendered = false;
+            return true;
         }
-        return vbox(children);
+
+        if (search_show) {
+            if (event.is_character() || event == Event::Backspace ||
+                event == Event::Return || event == Event::ArrowLeft ||
+                event == Event::ArrowRight || event == Event::Delete ||
+                event == Event::Escape) {
+                return search_input->OnEvent(event);
+            }
+            return false;
+        }
+
+        return false;
     });
 
     co_await renderLogin();
 
-    auto user_home = Container::Vertical(
-            { Container::Horizontal({ user_Profile }),
-              userTopTracksMenu });
 
     Loop mainLoop(&screen, renderer);
 
@@ -188,14 +310,34 @@ asio::awaitable<void> Ui::render() {
     screen.Exit();
     Log::instance().info("ui render exit");
 }
-    std::vector<std::string> tab_values{
-        "Home",
-        "User",
-    };
-    int tab_drawn = 0;
-    auto tab_toggle = Toggle(&tab_values, &tab_drawn);
 
-    auto tab_container = Container::Tab({ menu, user_home }, &tab_drawn);
+void Ui::updateFrame() {
+    auto size = Terminal::Size();
+
+    if (size.dimy * 2 >= size.dimx) {
+        term_direction = TermDirection::Vertical;
+        if (size.dimy > 40 && size.dimx > 80) {
+            term_size = TermSize::Large;
+        } else if (size.dimy < 46 && size.dimx < 50) {
+            term_size = TermSize::Small;
+        } else {
+            term_size = TermSize::Medium;
+        }
+    } else {
+        term_direction = TermDirection::Horizontal;
+        if (size.dimy > 34 && size.dimx > 128) {
+            term_size = TermSize::Large;
+        } else if (size.dimy < 80 && size.dimx < 24) {
+            term_size = TermSize::Small;
+        } else {
+            term_size = TermSize::Medium;
+        }
+    }
+    // Log::instance().info("term dimy:{},dimx:{},size:{},dire:{}", size.dimy,
+    //                      size.dimx, magic_enum::enum_name(term_size),
+    //                      magic_enum::enum_name(term_direction));
+}
+
 ftxui::Element Ui::render_cava() {
     auto bars = g_visualizer->bars.read().value;
     ftxui::Elements columns;
@@ -217,64 +359,142 @@ ftxui::Element Ui::render_cava() {
     return ftxui::hbox(std::move(columns));
 }
 
-    auto container = Container::Vertical({ tab_toggle, tab_container });
 
-    std::map<std::string, std::string> help_map = {
-        { "?", "help" },
+void Ui::render_proc(bool enable) {
+    if (enable) {
+        proc_section = Renderer([&] {
+            auto cpu_usage =
+                    Proc::Info::instance().cpu_info.read().value.get_usage();
+            std::wstring wcpu = std::format(L"{:.1f}", cpu_usage);
+            auto mem_mb =
+                    Proc::Info::instance().stat_info.read().value.get_memory();
+            std::wstring wmem = std::format(L"{:.1f}", mem_mb);
+            return text("cpu:" + ::to_string(wcpu) + "%" + " " +
+                        "mem:" + ::to_string(wmem) + "M") |
+                   center;
+        });
+    } else {
+        proc_section = Renderer([] { return emptyElement(); });
+    }
+}
+
+void Ui::render_help() {
+    // help show
+    static std::vector<std::pair<std::string, std::string>> help_map = {
+        { "?", "show help windows" },
         { "q", "exit app" },
-        { "<enter> e", "tree" },
+        { "r", "return" },
+        { "<enter>", "pause/play music" },
+        { "[", "select the last song" },
+        { "]", "select the next song" },
+        { "/", "search anything" },
+        { "i", "show image in new windows" },
+        { "s", "shuffle the song" },
+        { "R", "repeatt the song" },
+        { "r", "return last windows" },
+        { "-", "set song's volume down" },
+        { "=", "set song's volume up" },
+        { "a", "add this song to current queue" },
     };
 
-    bool help_show = false;
 
-    auto left_column = Renderer([&] {
+    static auto left_column = Renderer([&] {
         Elements children = {};
-        children.push_back(underlined(text("Key:")));
+        children.push_back(
+                underlined(hbox({ filler(), text("Key:"), filler() })));
         for (auto i : help_map) {
-            children.push_back(text(i.first));
+            children.push_back(hbox({ filler(), text(i.first), filler() }));
         }
         return vbox(children);
     });
 
-    auto right_column = Renderer([&] {
+    static auto right_column = Renderer([&] {
         Elements children = {};
-        children.push_back(underlined(text("Description:")));
+        children.push_back(
+                underlined(hbox({ text("Description:"), filler() })));
         for (auto i : help_map) {
-            children.push_back(text(i.second));
+            children.push_back(hbox({ text(i.second), filler() }));
         }
         return vbox(children);
     });
 
-    auto help_component = Renderer([&] {
-        return color(Color::Blue, hbox({
-                                          left_column->Render(),
-                                          separatorEmpty(),
-                                          right_column->Render(),
-                                  }) | border);
+    help_section = Renderer([&] {
+        return window(text("Help"), hbox({
+                                            filler(),
+                                            left_column->Render(),
+                                            separatorEmpty(),
+                                            right_column->Render(),
+                                            filler(),
+                                    }) | size(WIDTH, EQUAL, 60) |
+                                            size(HEIGHT, EQUAL, 20));
     });
+}
 
-    auto maybe_help_component = Maybe(help_component, &help_show);
+void Ui::render_curlyrics() {
+    static std::string last_lyrics_request_id;
+    curlyrics = Renderer([&]() -> Element {
+        static int tick = 0;
 
-    // proc info
-    auto proc_info = Renderer([&]() -> Element {
-        auto cpu_usage =
-                Proc::Info::instance().cpu_info.read().value.get_usage();
-        std::wstring wcpu = std::format(L"{:.1f}", cpu_usage);
-        auto mem_mb =
-                Proc::Info::instance().stat_info.read().value.get_memory();
-        std::wstring wmem = std::format(L"{:.1f}", mem_mb);
-        return text("cpu:" + ::to_string(wcpu) + "%" + " " +
-                    "mem:" + ::to_string(wmem) + "M") |
-               center;
+        {
+            auto guard1 = spotifyData.currentlyPlayTrack.read();
+            if (guard1.value.currently_playing.name == "") {
+                return emptyElement();
+            }
+
+            if (last_lyrics_request_id != guard1.value.currently_playing.id) {
+                eventQueue.enqueue(SPOCLI::Event::GetLyrics);
+                last_lyrics_request_id = guard1.value.currently_playing.id;
+                tick = 0;
+            }
+        }
+
+        std::vector<LyricLine> lyricLine;
+        {
+            lyricLine = spotifyData.curLyric.read().value;
+            if (lyricLine.size() == 0) {
+                return text("");
+            }
+        }
+
+        int current = 0;
+        const int offset = 300; //FIX: 300ms offset for lyrics display
+        auto progress_ms = spotifyData.playback_progress() + offset;
+        for (int i = 0; i < lyricLine.size(); i++) {
+            if (lyricLine[i].time_ms <= progress_ms) {
+                current = i;
+            } else {
+                break;
+            }
+        }
+
+        int start = (current == 0) ? 0 : current - 1;
+        int end = std::min(start + 3, (int)lyricLine.size());
+        start = (end >= 3) ? end - 3 : 0;
+
+        Elements rows;
+        for (int i = start; i < end; i++) {
+            auto style = (i == current) ?
+                                 color(config.data.read()->theme.lyrics_fg) |
+                                         bold :
+                                 color(config.data.read()->theme.lyrics_bg);
+            rows.push_back(text(lyricLine[i].text) | style);
+        }
+
+        return vbox(std::move(rows));
     });
+}
 
-
-    // main ui
-    auto renderer = Renderer(container, [&] {
-        return vbox({ filler(), container->Render() | center,
-                      hbox({ filler(), proc_info->Render() }) });
+void Ui::render_username() {
+    user_name = Renderer([this]() -> Element {
+        auto guard = spotifyData.userProfile.read();
+        if (guard.value.displayName != "") {
+            return text("Hi! " + guard.value.displayName);
+        } else {
+            eventQueue.enqueue(SPOCLI::Event::GetUserProfile);
+            return text("Hi!");
+        }
     });
-
+}
 
 void Ui::render_current_playing_song() {
     static bool request_currently_playing_track = false;
@@ -321,19 +541,26 @@ void Ui::render_current_playing_song() {
     });
 }
 
-    renderer |= CatchEvent([&](Event event) {
-        if (event == Event::q || event == Event::CtrlC) {
-            screen.Exit();
-            queue.enqueue(SPOCLI::Event::Exit);
-            return true;
-        } else if (event == Event::Character('?')) {
-            help_show = !help_show;
-            maybe_help_component->TakeFocus();
+// TODO: add cur page search and remote search,now only support remote search
+void Ui::render_search() {
+    InputOption search_option;
+    search_option.multiline = false;
+    search_option.on_enter = [this]() { search_query.enqueue(search_name); };
+    search_input = Input(&search_name, "", search_option);
+
+    search_input |= CatchEvent([&](Event event) {
+        if (event == Event::Escape) {
+            search_name.clear();
+            search_show = false;
             return true;
         }
         return false;
     });
 
+    search_section = Renderer([&]() -> Element {
+        return hbox(text(": "), search_input->Render());
+    });
+}
 
 const std::vector<::Image> &Ui::get_current_image() {
     if (last_term_size != term_size) {
