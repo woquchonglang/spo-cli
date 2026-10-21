@@ -6,16 +6,18 @@ import mpmc;
 import std;
 import spotifyWebAPI;
 import event;
+import config;
 import asio;
 
 using namespace ftxui;
 
 export class Ui {
 public:
-    void render(moodycamel::Mpmc<SPOCLI::Event> &queue,
-                SpotifyData &spotifyData);
-    void renderLogin(moodycamel::Mpmc<SPOCLI::Event> &queue,
-                     SpotifyData &spotifyData);
+    Ui(Config &config, SpotifyData &spotifyData);
+    void reConfig();
+
+    asio::awaitable<void> render();
+    asio::awaitable<void> renderLogin();
 
 private:
     App screen = App::FullscreenAlternateScreen();

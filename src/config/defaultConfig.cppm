@@ -1,7 +1,7 @@
 module;
 #include <rfl/toml.hpp>
 #include <rfl.hpp>
-export module config.defaults;
+module config:defaults;
 
 import std;
 import config.data;
@@ -21,7 +21,7 @@ template <> struct Reflector<ftxui::Color> {
 };
 }
 
-export class DefaultConfig {
+class DefaultConfig {
 public:
     DefaultConfig(fs::path config_path) {
         std::ofstream file(config_path);

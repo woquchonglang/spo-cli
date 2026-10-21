@@ -23,13 +23,14 @@ export {
 
         std::string cache_path;
 
-        bool mpris_enable;
+        bool mpris_enable = false;
 
-        bool proc_enable;
+        bool proc_enable = false;
 
-        bool log_enable;
+        bool log_enable = false;
 
         // theme
+        std::string preset;
         Component_theme theme;
     };
 }

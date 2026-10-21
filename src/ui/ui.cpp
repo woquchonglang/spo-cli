@@ -9,10 +9,11 @@ import kittyImageComponent;
 import spotifyWebAPI;
 import event;
 import proc;
+Ui::Ui(Config &config, SpotifyData &spotifyData)
+        : screen(App::FullscreenAlternateScreen())
+        , config(config)
+        , spotifyData(spotifyData) {
 
-void Ui::renderLogin(moodycamel::Mpmc<SPOCLI::Event> &queue,
-                     SpotifyData &spotifyData) {
-    queue.enqueue(SPOCLI::Event::Login);
 
     auto cover = Renderer([&] {
         auto c = Canvas(80, 20);
@@ -38,7 +39,7 @@ void Ui::renderLogin(moodycamel::Mpmc<SPOCLI::Event> &queue,
     login |= CatchEvent([&](Event event) {
         if (event == Event::q || event == Event::CtrlC) {
             screen.Exit();
-            queue.enqueue(SPOCLI::Event::Exit);
+            eventQueue.enqueue(SPOCLI::Event::Exit);
             return true;
         }
         return false;
@@ -46,21 +47,21 @@ void Ui::renderLogin(moodycamel::Mpmc<SPOCLI::Event> &queue,
 
     Loop loginloop(&screen, login);
 
-    while (!spotifyData.isLogined.read().value) {
+    asio::steady_timer timer(co_await asio::this_coro::executor);
+    while (!spotifyData.isLogined.read().value && main_show) {
         loginloop.RunOnce();
         index++;
         ftxui::animation::RequestAnimationFrame();
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        timer.expires_after(std::chrono::milliseconds(100));
+        auto [ec] =
+                co_await timer.async_wait(asio::as_tuple(asio::use_awaitable));
+        if (ec)
+            co_return;
     }
 }
 
 
-void Ui::render(moodycamel::Mpmc<SPOCLI::Event> &queue,
-                SpotifyData &spotifyData) {
-    std::vector<std::string> entries = {
-        "Top Albums",
-        "Top Artists",
-        "Top Tracks",
+asio::awaitable<void> Ui::render() {
     };
     int selected = 0;
 
@@ -160,15 +161,29 @@ void Ui::render(moodycamel::Mpmc<SPOCLI::Event> &queue,
         return vbox(children);
     });
 
-    // Component userImage = image_view(spotifyData);
+    co_await renderLogin();
 
     auto user_home = Container::Vertical(
             { Container::Horizontal({ user_Profile }),
               userTopTracksMenu });
 
+    Loop mainLoop(&screen, renderer);
 
-    // auto user_home = Container::Vertical({ user_Profile, userTopTracksMenu });
+    asio::steady_timer timer(co_await asio::this_coro::executor);
+    while (main_show) {
+        updateFrame();
+        mainLoop.RunOnce();
+        ftxui::animation::RequestAnimationFrame();
+        timer.expires_after(std::chrono::milliseconds(16)); // 60fps
+        auto [ec] =
+                co_await timer.async_wait(asio::as_tuple(asio::use_awaitable));
+        if (ec)
+            co_return;
+    }
 
+    screen.Exit();
+    Log::instance().info("ui render exit");
+}
     std::vector<std::string> tab_values{
         "Home",
         "User",
@@ -250,7 +265,8 @@ void Ui::render(moodycamel::Mpmc<SPOCLI::Event> &queue,
         return false;
     });
 
-    renderLogin(std::ref(queue), spotifyData);
 
-    screen.Loop(renderer);
 }
+
+
+void Ui::reConfig() { render_proc(config.data.read()->proc_enable); }
