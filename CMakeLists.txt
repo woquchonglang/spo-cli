@@ -20,6 +20,16 @@ project(${CMAKE_PROJECT_NAME})
 
 option(SPOCLI_TEST "Set to ON to build tests" OFF)
 
+# linker
+find_program(MOLD_PROGRAM mold)
+if (MOLD_PROGRAM)
+    add_link_options(-fuse-ld=mold)
+    message(STATUS "mold found: ${MOLD_PROGRAM}")
+else ()
+    message(STATUS "mold not found")
+endif ()
+
+
 add_executable(${CMAKE_PROJECT_NAME} src/main.cpp)
 
 # lib
@@ -48,6 +58,7 @@ set(HTTPLIB_COMPILE ON)
 set(NLOHMANN_JSON_BUILD_MODULES ON CACHE BOOL "Enable nlohmann.json module support")
 set(BASE64_ENABLE_TESTING OFF)
 set(SPDLOG_USE_STD_FORMAT ON)
+set(MAGIC_ENUM_USE_MODULES ON)
 
 add_subdirectory(lib/nlohmann-json)
 add_subdirectory(lib/tomlplusplus)
@@ -58,11 +69,12 @@ add_subdirectory(lib/readerwriterqueue)
 add_subdirectory(lib/base64)
 add_subdirectory(lib/librespot-cpp)
 add_subdirectory(lib/spdlog)
+add_subdirectory(lib/magic_enum)
+add_subdirectory(lib/SQLiteCpp)
 add_subdirectory(lib/reflect-cpp)
 
 add_compile_definitions(BOOST_ASIO_HAS_IO_URING)
 # add_compile_definitions(BOOST_ASIO_HAS_IO_URING_AS_DEFAULT)
-add_compile_definitions(BOOST_ASIO_SEPARATE_COMPILATION)
 
 add_compile_options(
     $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CONFIG:Release>>:-ffunction-sections>
@@ -80,23 +92,12 @@ target_link_options(spo-cli PRIVATE
     $<$<CONFIG:Release>:-Wl,--as-needed>
 )
 
-# linker
-find_program(MOLD_PROGRAM mold)
-if (MOLD_PROGRAM)
-  target_link_options(${CMAKE_PROJECT_NAME} PRIVATE -fuse-ld=mold)
-else ()
-    message(STATUS "mold not found")
-endif ()
-
 set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES CXX_MODULE_STD ON)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
    set_property(TARGET ${CMAKE_PROJECT_NAME} PROPERTY
         INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
 endif()
-target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE
-    $<$<CONFIG:Release>:-flto=auto>
-)
 
 if(SPOCLI_TEST)
   include(test/test.cmake)
