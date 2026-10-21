@@ -1,11 +1,10 @@
 module;
-#include <boost/asio.hpp>
-#include <boost/asio/ssl.hpp>
-export module spotifyAuthPKCE;
+export module spotify:AuthPKCE;
 
 import config;
 import std;
 import nlohmann.json;
+import asio;
 
 std::vector<std::string> scopes = {
     // Images
@@ -47,9 +46,9 @@ struct TokenCache {
 
 export class SpotifyAuthPKCE {
 public:
-    SpotifyAuthPKCE(boost::asio::io_context &ioc, const Config &config);
+    SpotifyAuthPKCE(asio::io_context &ioc, const Config &config);
     ~SpotifyAuthPKCE();
-    boost::asio::awaitable<bool> login();
+    asio::awaitable<bool> login();
     std::shared_ptr<std::string> getAccessToken() { return access_token; }
 
 private:
@@ -58,12 +57,12 @@ private:
                         const std::filesystem::path &cache_path);
     std::optional<TokenCache>
     loadTokenCache(const std::filesystem::path &cachePath);
-    boost::asio::awaitable<nlohmann::json>
-    async_http_post(const std::string &host, const std::string &target,
-                    const std::string &body);
-    boost::asio::awaitable<void> startRefreshTimer();
-    boost::asio::awaitable<void> refreshAccessToken();
-    boost::asio::awaitable<nlohmann::json> async_http_refreshtoken_post();
+    asio::awaitable<nlohmann::json> async_http_post(const std::string &host,
+                                                    const std::string &target,
+                                                    const std::string &body);
+    asio::awaitable<void> startRefreshTimer();
+    asio::awaitable<void> refreshAccessToken();
+    asio::awaitable<nlohmann::json> async_http_refreshtoken_post();
 
 private:
     const Config &config;
@@ -72,7 +71,7 @@ private:
     std::string refresh_token;
     int expires_in;
     std::filesystem::path cache_file;
-    boost::asio::io_context &ioc;
-    boost::asio::ssl::context ctx;
+    asio::io_context &ioc;
+    asio::ssl::context ctx;
     std::optional<TokenCache> cache;
 };

@@ -1,68 +1,71 @@
-#include <boost/asio.hpp>
 import config;
-import spotifyWebAPI;
 import ui;
 import std;
 import ftxui;
 import event;
 import spsc;
-import librespot;
+import version;
+import mpris;
 import config.watcher;
 import log;
 import proc;
+import spotify;
+import asio;
 
 int main() {
-    boost::asio::io_context ioc;
+    asio::io_context ioc;
+    asio::thread_pool backend_thread(4);
 
     Config config;
     Log::instance().info("config init");
     ConfigWatcher watcher(config.config_directory, ioc);
-    boost::asio::co_spawn(
+    asio::co_spawn(
             ioc,
-            [&watcher]() -> boost::asio::awaitable<void> {
+            [&watcher]() -> asio::awaitable<void> {
                 co_await watcher.watch_inotify();
             },
-            boost::asio::detached);
+            asio::detached);
 
-    // boost::asio::post(pool, [this]() {
-    //     if (!ctx.has_value()) {
-    //         ctx.emplace(librespot::play_backends());
-    //     }
-    // });
     Log::instance().info("config watcher init");
 
-    boost::asio::co_spawn(
+    asio::co_spawn(
             ioc,
-            [&ioc]() -> boost::asio::awaitable<void> {
+            [&ioc]() -> asio::awaitable<void> {
                 co_await Proc::Info::instance().sample(ioc);
             },
-            boost::asio::detached);
+            asio::detached);
     Log::instance().info("proc init");
 
-    SpotifyData spotifyData;
+    SpotifyClient client(ioc, config, backend_thread);
 
-    Ui ui;
+    Ui ui(config, client.data);
+    watcher.setOnChange([&config, &ui] {
+        config.refresh();
+        ui.screen.PostEvent(Event_ReConfig);
+    });
     Log::instance().info("ui visualizer init");
 
-    Librespot librespot(ioc.get_executor(), spotifyData);
-    Log::instance().info("librespot init");
+    AsyncEventHandler eventHandler(ioc, client, ui);
 
-    AsyncEventHandler eventHandler(ioc, config, spotifyData, librespot);
-
-    eventHandler.scheduleExitHandler([&librespot] { librespot.stop(); });
-    boost::asio::co_spawn(
+    eventHandler.scheduleExitHandler([&client] { client.librespot.stop(); });
+    asio::co_spawn(
             ioc,
-            [&ioc, &eventHandler]() -> boost::asio::awaitable<void> {
+            [&ioc, &eventHandler]() -> asio::awaitable<void> {
                 co_await eventHandler.handle();
             },
-            boost::asio::detached);
+            asio::detached);
     Log::instance().info("eventHandler init");
 
-    std::jthread uiThread(
-            [&ui, &spotifyData]() { ui.render(eventQueue, spotifyData); });
+    asio::co_spawn(
+            ioc,
+            [&ioc, &ui]() -> asio::awaitable<void> { co_await ui.render(); },
+            asio::detached);
+    Log::instance().info("ui init ");
 
     eventHandler.scheduleExitHandler([&ioc] { ioc.stop(); });
-    Log::instance().info("cororuntime init ");
+    Log::instance().info("coroutine init ");
 
     ioc.run();
+
+    backend_thread.join();
 }

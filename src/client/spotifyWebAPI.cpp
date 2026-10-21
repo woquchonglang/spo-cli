@@ -1,58 +1,44 @@
 module;
 #include <sys/socket.h>
-#include <boost/beast.hpp>
-#include <boost/beast/ssl.hpp>
-#include <boost/asio.hpp>
-#include <boost/asio/ssl.hpp>
-#include <boost/asio/awaitable.hpp>
-#include <boost/asio/use_awaitable.hpp>
-module spotifyWebAPI;
+#include <stdio.h>
+module spotify;
 
 import http.client;
+import log;
 
-namespace beast = boost::beast;
+namespace ssl = asio::ssl;
 namespace http = beast::http;
-namespace net = boost::asio;
-namespace ssl = boost::asio::ssl;
-using tcp = net::ip::tcp;
-
 template <class... Ts> struct overloaded : Ts... {
     using Ts::operator()...;
 };
 
 struct APIImpl {
-    APIImpl()
-            : work(boost::asio::make_work_guard(ioc))
+    APIImpl(asio::io_context &ioc)
+            : ioc(ioc)
+            , work(asio::make_work_guard(ioc))
             , ctx(ssl::context::tls_client) {
         ctx.set_default_verify_paths();
         ctx.set_verify_mode(ssl::verify_peer);
-        asio_thread = std::thread([this]() { ioc.run(); });
     }
-    ~APIImpl() {
-        work.reset();
-        ioc.stop();
-        if (asio_thread.joinable()) {
-            asio_thread.join();
-        }
-    }
+    ~APIImpl() { work.reset(); }
 
     template <typename T>
-    net::awaitable<T> async_http_get(const std::string &host,
-                                     const std::string &target,
-                                     const std::string &token);
+    asio::awaitable<T> async_http_get(const std::string &host,
+                                      const std::string &target,
+                                      const std::string &token);
 
-    net::awaitable<void> async_http_put(const std::string &host,
-                                        const std::string &target,
-                                        const std::string &token);
-
-    net::awaitable<void> async_http_put(const std::string &host,
-                                        const std::string &target,
-                                        const std::string &token,
-                                        const std::string &body);
-
-    net::awaitable<void> async_http_post(const std::string &host,
+    asio::awaitable<void> async_http_put(const std::string &host,
                                          const std::string &target,
                                          const std::string &token);
+
+    asio::awaitable<void> async_http_put(const std::string &host,
+                                         const std::string &target,
+                                         const std::string &token,
+                                         const std::string &body);
+
+    asio::awaitable<void> async_http_post(const std::string &host,
+                                          const std::string &target,
+                                          const std::string &token);
 
     template <typename T>
     void fetchData(const std::string &endpoint, const std::string &target,
@@ -70,10 +56,8 @@ struct APIImpl {
     void post(const std::string &endpoint, const std::string &target,
               const std::string &accessToken, std::function<void()> onComplete);
 
-    boost::asio::io_context ioc;
-    boost::asio::executor_work_guard<boost::asio::io_context::executor_type>
-            work;
-    std::thread asio_thread;
+    asio::io_context &ioc;
+    asio::executor_work_guard<asio::io_context::executor_type> work;
 
     ssl::context ctx;
     static constexpr std::string_view host = "api.spotify.com";
@@ -84,9 +68,9 @@ template <typename T> T parse_response(const nlohmann::json &response) {
 }
 
 template <typename T>
-net::awaitable<T> APIImpl::async_http_get(const std::string &host,
-                                          const std::string &target,
-                                          const std::string &token) {
+asio::awaitable<T> APIImpl::async_http_get(const std::string &host,
+                                           const std::string &target,
+                                           const std::string &token) {
     http::request<http::string_body> req{ http::verb::get, target, 11 };
     req.set(http::field::host, host);
     req.set(http::field::authorization, "Bearer " + token);
@@ -94,7 +78,8 @@ net::awaitable<T> APIImpl::async_http_get(const std::string &host,
 
     auto res = co_await client_read(host, "443", ctx, std::move(req));
 
-    if (res.result_int() == 200) {
+    int result = res.result_int();
+    if (result == 200) {
         nlohmann::json response = nlohmann::json::parse(
                 beast::buffers_to_string(res.body().data()));
         auto data = parse_response<T>(response);
@@ -104,9 +89,9 @@ net::awaitable<T> APIImpl::async_http_get(const std::string &host,
     }
 }
 
-net::awaitable<void> APIImpl::async_http_put(const std::string &host,
-                                             const std::string &target,
-                                             const std::string &token) {
+asio::awaitable<void> APIImpl::async_http_put(const std::string &host,
+                                              const std::string &target,
+                                              const std::string &token) {
     http::request<http::string_body> req{ http::verb::put, target, 11 };
     req.set(http::field::host, host);
     req.set(http::field::authorization, "Bearer " + token);
@@ -121,10 +106,10 @@ net::awaitable<void> APIImpl::async_http_put(const std::string &host,
     }
 }
 
-net::awaitable<void> APIImpl::async_http_put(const std::string &host,
-                                             const std::string &target,
-                                             const std::string &token,
-                                             const std::string &body) {
+asio::awaitable<void> APIImpl::async_http_put(const std::string &host,
+                                              const std::string &target,
+                                              const std::string &token,
+                                              const std::string &body) {
     http::request<http::string_body> req{ http::verb::put, target, 11 };
     req.set(http::field::host, host);
     req.set(http::field::authorization, "Bearer " + token);
@@ -141,9 +126,9 @@ net::awaitable<void> APIImpl::async_http_put(const std::string &host,
     co_return;
 }
 
-net::awaitable<void> APIImpl::async_http_post(const std::string &host,
-                                              const std::string &target,
-                                              const std::string &token) {
+asio::awaitable<void> APIImpl::async_http_post(const std::string &host,
+                                               const std::string &target,
+                                               const std::string &token) {
     http::request<http::string_body> req{ http::verb::post, target, 11 };
     req.set(http::field::host, host);
     req.set(http::field::authorization, "Bearer " + token);
@@ -163,10 +148,10 @@ template <typename T>
 void APIImpl::fetchData(const std::string &endpoint, const std::string &target,
                         const std::string &accessToken,
                         std::function<void(T)> onComplete) {
-    net::co_spawn(
+    asio::co_spawn(
             ioc,
             [this, endpoint, target, accessToken,
-             onComplete]() -> boost::asio::awaitable<void> {
+             onComplete]() -> asio::awaitable<void> {
                 try {
                     auto data = co_await async_http_get<T>(endpoint, target,
                                                            accessToken);
@@ -179,16 +164,16 @@ void APIImpl::fetchData(const std::string &endpoint, const std::string &target,
                         onComplete(T{});
                 }
             },
-            boost::asio::detached);
+            asio::detached);
 }
 
 void APIImpl::fetch(const std::string &endpoint, const std::string &target,
                     const std::string &accessToken,
                     std::function<void()> onComplete) {
-    net::co_spawn(
+    asio::co_spawn(
             ioc,
             [this, endpoint, target, accessToken,
-             onComplete]() -> boost::asio::awaitable<void> {
+             onComplete]() -> asio::awaitable<void> {
                 try {
                     co_await async_http_put(endpoint, target, accessToken);
                     if (onComplete)
@@ -199,16 +184,16 @@ void APIImpl::fetch(const std::string &endpoint, const std::string &target,
                         onComplete();
                 }
             },
-            boost::asio::detached);
+            asio::detached);
 }
 
 void APIImpl::put_data(const std::string &endpoint, const std::string &target,
                        const std::string &accessToken, std::string body,
                        std::function<void()> onComplete) {
-    net::co_spawn(
+    asio::co_spawn(
             ioc,
             [this, endpoint, target, accessToken, body,
-             onComplete]() -> boost::asio::awaitable<void> {
+             onComplete]() -> asio::awaitable<void> {
                 try {
                     co_await async_http_put(endpoint, target, accessToken,
                                             body);
@@ -220,16 +205,16 @@ void APIImpl::put_data(const std::string &endpoint, const std::string &target,
                         onComplete();
                 }
             },
-            boost::asio::detached);
+            asio::detached);
 }
 
 void APIImpl::post(const std::string &endpoint, const std::string &target,
                    const std::string &accessToken,
                    std::function<void()> onComplete) {
-    net::co_spawn(
+    asio::co_spawn(
             ioc,
             [this, endpoint, target, accessToken,
-             onComplete]() -> boost::asio::awaitable<void> {
+             onComplete]() -> asio::awaitable<void> {
                 try {
                     co_await async_http_post(endpoint, target, accessToken);
                     if (onComplete)
@@ -240,20 +225,20 @@ void APIImpl::post(const std::string &endpoint, const std::string &target,
                         onComplete();
                 }
             },
-            boost::asio::detached);
+            asio::detached);
 }
 
 
-SpotifyWebAPI::SpotifyWebAPI(std::shared_ptr<std::string> accessToken,
+SpotifyWebAPI::SpotifyWebAPI(asio::io_context &ioc,
+                             std::shared_ptr<std::string> accessToken,
                              SpotifyData &data)
         : accessToken(accessToken)
         , spotifyData(data)
-        , apiImpl(std::make_unique<APIImpl>()) {};
+        , apiImpl(std::make_unique<APIImpl>(ioc)) {};
 
 SpotifyWebAPI::~SpotifyWebAPI() {}
 
 void SpotifyWebAPI::updateAccessToken(std::shared_ptr<std::string> token) {
-    spotifyData.isLogined.write().value = true;
     accessToken = token;
 }
 
@@ -342,6 +327,19 @@ void SpotifyWebAPI::TransferPlayback(std::function<void()> cb, bool play) {
     }
 }
 
+asio::awaitable<void> SpotifyWebAPI::TransferPlayback(bool play) {
+    std::string url = "/v1/me/player";
+    auto guard = spotifyData.devices.read();
+    if (!guard.value.empty()) {
+        std::string body = std::format(R"({{"device_ids":["{}"],"play":{}}})",
+                                       guard.value[0].id,
+                                       play ? "true" : "false");
+        co_await apiImpl->async_http_put("api.spotify.com", url,
+                                         *accessToken.get(), body);
+    }
+    co_return;
+}
+
 void SpotifyWebAPI::GetCurrentlyPlayingTrack(std::function<void()> cb) {
     std::string url = "/v1/me/player/currently-playing";
 
@@ -355,6 +353,14 @@ void SpotifyWebAPI::GetCurrentlyPlayingTrack(std::function<void()> cb) {
             });
 }
 
+asio::awaitable<void> SpotifyWebAPI::GetCurrentlyPlayingTrack() {
+    std::string url = "/v1/me/player/currently-playing";
+    auto track = co_await apiImpl->async_http_get<CurrentlyPlayingTrack>(
+            "api.spotify.com", url, *accessToken.get());
+    spotifyData.currentlyPlayTrack.write().value = track;
+    spotifyData.update_playback_last_updated_time();
+}
+
 void SpotifyWebAPI::GetAvailableDevices(std::function<void()> cb) {
     std::string url = "/v1/me/player/devices";
     apiImpl->fetchData<std::vector<Device>>(
@@ -363,6 +369,40 @@ void SpotifyWebAPI::GetAvailableDevices(std::function<void()> cb) {
                 spotifyData.devices.write().value = devices;
                 cb();
             });
+}
+
+asio::awaitable<void> SpotifyWebAPI::AsyncGetAvailableDevices() {
+    std::string url = "/v1/me/player/devices";
+    auto data = co_await apiImpl->async_http_get<std::vector<Device>>(
+            "api.spotify.com", url, *accessToken.get());
+    spotifyData.devices.write().value = data;
+}
+
+asio::awaitable<void> SpotifyWebAPI::GetUserPlaylistItems(
+        const std::string &playlist_id, const std::string &market,
+        const std::string &fields, const int limit, const int offset,
+        const std::string &additional_types) {
+    bool first = true;
+    std::string url = "/v1/me/player/playlists/" + playlist_id + "/items";
+    auto append_param = [&](const std::string &key, const std::string &value) {
+        url += (first ? "?" : "&");
+        url += key + "=" + value;
+        first = false;
+    };
+    if (!market.empty())
+        append_param("market", market);
+    if (!fields.empty())
+        append_param("fields", fields);
+    if (limit > 0)
+        append_param("limit", std::to_string(limit));
+    if (offset > 0)
+        append_param("offset", std::to_string(offset));
+    if (!additional_types.empty())
+        append_param("additional_types", additional_types);
+
+    auto data = co_await apiImpl->async_http_get<UserPlaylistItems>(
+            "api.spotify.com", url, *accessToken.get());
+    spotifyData.userPlaylistItems.write().value = data;
 }
 
 void SpotifyWebAPI::GetUserQueue(std::function<void()> cb) {
@@ -469,6 +509,49 @@ void SpotifyWebAPI::setPlaybackVolume(const int volume, std::string device_id) {
     apiImpl->fetch("api.spotify.com", url, *accessToken.get(), cbImpl);
 }
 
+asio::awaitable<void>
+SpotifyWebAPI::AsyncSetPlaybackVolume(const int volume, std::string device_id) {
+    std::string url =
+            "/v1/me/player/volume?volume_percent=" + std::to_string(volume);
+    if (!device_id.empty()) {
+        url += "&device_id=" + device_id;
+    }
+    co_await apiImpl->async_http_put(endpoint, url, *accessToken.get());
+    auto guard = this->spotifyData.devices.write();
+    if (!guard.value.empty()) {
+        guard.value[0].volume_percent = volume;
+    }
+}
+
+
+asio::awaitable<void>
+SpotifyWebAPI::Search(const std::string &q, const std::string &type,
+                      const std::string &market, const int limit,
+                      const int offset, const std::string &include_external) {
+    std::string url = "/v1/search?" + q + "&type=";
+    if (type.empty()) {
+        url += "track,artist,album,playlist";
+    } else {
+        url += type;
+    }
+    if (!market.empty()) {
+        url += "&market=" + market;
+    }
+    if (limit > 0) {
+        url += "&limit=" + std::to_string(limit);
+    }
+    if (offset > 0) {
+        url += "&offset=" + std::to_string(offset);
+    }
+    if (!include_external.empty()) {
+        url += "&include_external=" + include_external;
+    }
+
+    auto data = co_await apiImpl->async_http_get<SearchResult>(
+            "api.spotify.com", url, *accessToken.get());
+    spotifyData.searchResult.write().value = data;
+}
+
 template <>
 UserProfile parse_response<UserProfile>(const nlohmann::json &response) {
     UserProfile profile;
@@ -537,6 +620,29 @@ parse_response<UserPlaylistsData>(const nlohmann::json &response) {
     for (const auto &item : response["items"]) {
         data.items.push_back(item["name"]);
     }
+    data.total = response.value("total", 0);
+
+    return data;
+}
+
+template <>
+UserPlaylistItems
+parse_response<UserPlaylistItems>(const nlohmann::json &response) {
+    UserPlaylistItems data;
+    data.href = response.value("href", "");
+    data.limit = response.value("limit", 0);
+    data.next = response.value("next", "");
+    data.offset = response.value("offset", 0);
+    data.total = response.value("total", 0);
+    for (const auto &item : response["items"]) {
+        data.added_at.push_back(item["added_at"]);
+        data.added_by.push_back(item["added_by"]);
+        data.is_local.push_back(item["is_local"]);
+        data.atrists_name.push_back(item["artists"][0]["name"]);
+        data.track_name.push_back(item["name"]);
+        data.id.push_back(item["id"]);
+        data.track_uri.push_back(item["uri"]);
+    }
     return data;
 }
 
@@ -566,7 +672,7 @@ parse_response<CurrentlyPlayingTrack>(const nlohmann::json &response) {
             data.currently_playing.atrists_name.push_back(artist["name"]);
         }
         data.currently_playing.duration_ms = item["duration_ms"];
-        auto &images = item["images"];
+        auto &images = item["album"]["images"];
         if (images.is_array() && !images.empty() && !images[0].is_null()) {
             Image img;
             img.url = images[0]["url"];
@@ -627,5 +733,11 @@ UserQueueData parse_response<UserQueueData>(const nlohmann::json &response) {
         }
         data.currently_playing.duration_ms = currently_playing["duration_ms"];
     }
+    return data;
+}
+
+template <>
+SearchResult parse_response<SearchResult>(const nlohmann::json &response) {
+    SearchResult data{};
     return data;
 }

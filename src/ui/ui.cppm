@@ -1,12 +1,12 @@
 module;
 export module ui;
-export import ui.cover;
 
 import ftxui;
 import mpmc;
 import std;
 import spotifyWebAPI;
 import event;
+import asio;
 
 using namespace ftxui;
 

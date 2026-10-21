@@ -1,10 +1,10 @@
 module;
-#include <boost/asio.hpp>
 export module proc;
 
 import std;
 import rwlock;
 import singleton;
+import asio;
 
 export namespace Proc {
 
@@ -46,7 +46,7 @@ public:
     RwLock<CpuInfo> cpu_info;
     RwLock<StatmInfo> stat_info;
 
-    boost::asio::awaitable<void> sample(boost::asio::io_context &ioc);
+    asio::awaitable<void> sample(asio::io_context &ioc);
 
 private:
     Info();

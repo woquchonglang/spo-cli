@@ -1,6 +1,6 @@
 module;
 #include <unistd.h>
-#include <boost/asio.hpp>
+#include <boost/asio/awaitable.hpp>
 module proc;
 
 import event;
@@ -85,14 +85,14 @@ double StatmInfo::get_memory() const { return rss_mb; }
 
 Info::Info() : cpu_info(CpuInfo{}), stat_info(StatmInfo{}) {}
 
-boost::asio::awaitable<void> Info::sample(boost::asio::io_context &ioc) {
-    boost::asio::steady_timer timer(ioc);
+asio::awaitable<void> Info::sample(asio::io_context &ioc) {
+    asio::steady_timer timer(ioc);
     while (true) {
         auto now = std::chrono::steady_clock::now();
         auto next = cpu_info.read().value.next_tick;
         if (next > now) {
             timer.expires_at(next);
-            co_await timer.async_wait(boost::asio::use_awaitable);
+            co_await timer.async_wait(asio::use_awaitable);
         }
         cpu_info.write().value.update_usage();
         stat_info.write().value.update_memory();

@@ -1,5 +1,5 @@
 module;
-export module spotify_data;
+export module spotify.data;
 
 import std;
 import rwlock;
@@ -41,6 +41,56 @@ export {
     struct UserPlaylistsData {
         std::vector<std::string> items;
         int total;
+    };
+
+    struct AlbumItems {
+        std::string album_type;
+        int total_tracks;
+        std::string external_urls;
+        std::string id;
+        SizesImages image;
+        std::string name;
+        std::string release_date;
+        std::string uri;
+        std::vector<std::string> artists_name;
+    };
+
+    struct AlbumData {
+        int limit;
+        std::string next;
+        int offset;
+        std::string previous;
+        int total;
+        std::vector<AlbumItems> items;
+    };
+
+    struct UserPlaylistTrack {
+        std::string added_at;
+        std::string added_by;
+        bool is_local;
+        std::string atrists_name;
+        std::string track_name;
+        std::string id;
+        std::string track_uri;
+        SizesImages image;
+    };
+
+    struct UserPlaylistItems {
+        std::string href;
+        int limit;
+        std::string next;
+        int offset;
+        std::string previous;
+        int total;
+        // UserPlaylistItems
+        std::vector<std::string> added_at;
+        std::vector<std::string> added_by;
+        std::vector<bool> is_local;
+        std::vector<std::string> atrists_name;
+        std::vector<std::string> track_name;
+        std::vector<std::string> id;
+        std::vector<std::string> track_uri;
+        std::vector<SizesImages> image;
     };
 
     // player
@@ -115,6 +165,14 @@ export {
         std::string text;
     };
 
+    // search
+    struct SearchResult {
+        std::optional<UserTopTracksData> tracks;
+        std::optional<UserTopArtistsData> artists;
+        std::optional<AlbumData> albums;
+        std::optional<UserPlaylistsData> playlists;
+    };
+
     struct SpotifyData {
         RwLock<UserProfile> userProfile;
         RwLock<UserTopTracksData> topTracks;
@@ -124,6 +182,9 @@ export {
         // player
         RwLock<CurrentlyPlayingTrack> currentlyPlayTrack;
         RwLock<std::vector<Device>> devices;
+        RwLock<UserPlaylistItems> userPlaylistItems;
+        // search
+        RwLock<SearchResult> searchResult;
         // lyrics
         RwLock<std::vector<LyricLine>> curLyric;
 

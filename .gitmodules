@@ -46,3 +46,6 @@
 [submodule "lib/reflect-cpp"]
 	path = lib/reflect-cpp
 	url = https://github.com/getml/reflect-cpp.git
+[submodule "lib/SQLiteCpp"]
+	path = lib/SQLiteCpp
+	url = https://github.com/SRombauts/SQLiteCpp.git

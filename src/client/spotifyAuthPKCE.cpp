@@ -9,15 +9,12 @@ module;
 #include <boost/asio/ssl.hpp>
 #include <boost/beast.hpp>
 #include <boost/beast/ssl.hpp>
-module spotifyAuthPKCE;
+module spotify;
 
 import http.client;
 
-namespace beast = boost::beast;
+namespace ssl = asio::ssl;
 namespace http = beast::http;
-namespace net = boost::asio;
-namespace ssl = boost::asio::ssl;
-using tcp = net::ip::tcp;
 namespace fs = std::filesystem;
 
 // Code Verifier, refer to https://generate-random.org/strings/cpp
@@ -109,13 +106,11 @@ std::string extract_code(const std::string &target) {
     return target.substr(pos, end - pos);
 }
 
-SpotifyAuthPKCE::SpotifyAuthPKCE(boost::asio::io_context &ioc,
-                                 const Config &config)
+SpotifyAuthPKCE::SpotifyAuthPKCE(::asio::io_context &ioc, const Config &config)
         : config(config), ioc(ioc), ctx(ssl::context::tls_client) {
     ctx.set_default_verify_paths();
     ctx.set_verify_mode(ssl::verify_peer);
-    fs::path cache_path =
-            expand_shell_path(config.data.read().value.cache_path);
+    fs::path cache_path = expand_shell_path(config.data.read()->cache_path);
     cache_file = cache_path / "token.json";
 }
 
@@ -135,18 +130,16 @@ unsigned short parse_port_from_url(const std::string &url) {
 
 class CallbackServer {
 public:
-    CallbackServer(boost::asio::ip::tcp::acceptor acceptor)
+    CallbackServer(asio::net::tcp::acceptor acceptor)
             : acceptor_(std::move(acceptor)) {}
 
-    boost::asio::awaitable<std::string> wait_for_code() {
-        auto socket =
-                co_await acceptor_.async_accept(boost::asio::use_awaitable);
+    asio::awaitable<std::string> wait_for_code() {
+        auto socket = co_await acceptor_.async_accept(asio::use_awaitable);
 
-        boost::beast::flat_buffer buffer;
-        boost::beast::http::request<boost::beast::http::string_body> req;
-        auto [ec, n] = co_await boost::beast::http::async_read(
-                socket, buffer, req,
-                boost::asio::as_tuple(boost::asio::use_awaitable));
+        beast::flat_buffer buffer;
+        beast::http::request<beast::http::string_body> req;
+        auto [ec, n] = co_await beast::http::async_read(
+                socket, buffer, req, asio::as_tuple(asio::use_awaitable));
         if (ec) {
             std::cerr << "read error: " << ec.message() << std::endl;
             co_return "";
@@ -155,39 +148,36 @@ public:
         std::string target = req.target();
         std::string code = extract_code(target);
 
-        boost::beast::http::response<boost::beast::http::string_body> res{
-            boost::beast::http::status::ok, req.version()
+        beast::http::response<beast::http::string_body> res{
+            beast::http::status::ok, req.version()
         };
-        res.set(boost::beast::http::field::content_type, "text/html");
+        res.set(beast::http::field::content_type, "text/html");
         res.body() = "<html><body><h1>Authorization Successful</h1>"
                      "<p>You can close this window.</p></body></html>";
         res.prepare_payload();
-        co_await boost::beast::http::async_write(socket, res,
-                                                 boost::asio::use_awaitable);
+        co_await beast::http::async_write(socket, res, asio::use_awaitable);
 
         co_return code;
     }
 
 private:
-    boost::asio::ip::tcp::acceptor acceptor_;
+    asio::net::tcp::acceptor acceptor_;
 };
 
 
-boost::asio::awaitable<CallbackServer>
-start_callback_server(unsigned short port) {
-    auto executor = co_await boost::asio::this_coro::executor;
-    boost::asio::ip::tcp::acceptor acceptor(
-            executor,
-            boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), port));
+asio::awaitable<CallbackServer> start_callback_server(unsigned short port) {
+    auto executor = co_await asio::this_coro::executor;
+    asio::net::tcp::acceptor acceptor(
+            executor, asio::net::tcp::endpoint(asio::net::tcp::v4(), port));
     co_return CallbackServer(std::move(acceptor));
 }
 
-boost::asio::awaitable<bool> SpotifyAuthPKCE::login() {
+asio::awaitable<bool> SpotifyAuthPKCE::login() {
     codeVerifier = generateRandomString(64);
     auto hashed = sha256(codeVerifier);
     auto codeChallenge = base64encode(hashed);
-    auto client_id = config.data.read().value.client_id;
-    auto redirect_url = config.data.read().value.login_redirect_url;
+    auto client_id = config.data.read()->client_id;
+    auto redirect_url = config.data.read()->login_redirect_url;
     auto scope = scopes_to_string(scopes);
 
     cache = loadTokenCache(cache_file);
@@ -198,22 +188,22 @@ boost::asio::awaitable<bool> SpotifyAuthPKCE::login() {
             *this->access_token = cache.value().access_token;
             this->refresh_token = cache.value().refresh_token;
             this->expires_in = cache.value().expires_in;
-            boost::asio::co_spawn(
+            asio::co_spawn(
                     ioc,
-                    [this]() -> boost::asio::awaitable<void> {
+                    [this]() -> asio::awaitable<void> {
                         co_await startRefreshTimer();
                     },
-                    boost::asio::detached);
+                    asio::detached);
             co_return true;
         } else {
             this->refresh_token = cache.value().refresh_token;
             co_await refreshAccessToken();
-            boost::asio::co_spawn(
+            asio::co_spawn(
                     ioc,
-                    [this]() -> boost::asio::awaitable<void> {
+                    [this]() -> asio::awaitable<void> {
                         co_await startRefreshTimer();
                     },
-                    boost::asio::detached);
+                    asio::detached);
             co_return true;
         }
     }
@@ -227,8 +217,7 @@ boost::asio::awaitable<bool> SpotifyAuthPKCE::login() {
                            codeChallenge +
                            "&redirect_uri=" + uri_encode(redirect_url);
 
-    auto port =
-            parse_port_from_url(config.data.read().value.login_redirect_url);
+    auto port = parse_port_from_url(config.data.read()->login_redirect_url);
     auto server = co_await start_callback_server(port);
 
     std::string cmd = "xdg-open '" + auth_url + "'";
@@ -256,26 +245,26 @@ boost::asio::awaitable<bool> SpotifyAuthPKCE::login() {
                           .token_acquire_time =
                                   std::chrono::system_clock::now() };
         saveTokenCache(cache, cache_file);
-        boost::asio::co_spawn(
+        asio::co_spawn(
                 ioc,
-                [this]() -> boost::asio::awaitable<void> {
+                [this]() -> asio::awaitable<void> {
                     co_await startRefreshTimer();
                 },
-                boost::asio::detached);
+                asio::detached);
         co_return true;
     }
     co_return false;
 }
 
-boost::asio::awaitable<void> SpotifyAuthPKCE::startRefreshTimer() {
-    boost::asio::steady_timer timer(co_await boost::asio::this_coro::executor);
+asio::awaitable<void> SpotifyAuthPKCE::startRefreshTimer() {
+    asio::steady_timer timer(co_await asio::this_coro::executor);
     for (;;) {
         auto now = std::chrono::system_clock::now();
         auto delay = now - cache.value().token_acquire_time;
         timer.expires_after(
                 std::chrono::duration_cast<std::chrono::milliseconds>(delay));
-        auto [ec] = co_await timer.async_wait(
-                boost::asio::as_tuple(boost::asio::use_awaitable));
+        auto [ec] =
+                co_await timer.async_wait(asio::as_tuple(asio::use_awaitable));
         if (ec)
             co_return;
         co_await refreshAccessToken();
@@ -283,7 +272,7 @@ boost::asio::awaitable<void> SpotifyAuthPKCE::startRefreshTimer() {
     co_return;
 }
 
-boost::asio::awaitable<void> SpotifyAuthPKCE::refreshAccessToken() {
+asio::awaitable<void> SpotifyAuthPKCE::refreshAccessToken() {
     auto response = co_await async_http_refreshtoken_post();
     if (!response.is_null()) {
         *this->access_token = response["access_token"];
@@ -347,7 +336,7 @@ void SpotifyAuthPKCE::saveTokenCache(const TokenCache &cache,
     f.close();
 }
 
-boost::asio::awaitable<nlohmann::json>
+asio::awaitable<nlohmann::json>
 SpotifyAuthPKCE::async_http_post(const std::string &host,
                                  const std::string &target,
                                  const std::string &body) {
@@ -372,11 +361,12 @@ SpotifyAuthPKCE::async_http_post(const std::string &host,
     co_return response;
 }
 
-net::awaitable<nlohmann::json> SpotifyAuthPKCE::async_http_refreshtoken_post() {
+asio::awaitable<nlohmann::json>
+SpotifyAuthPKCE::async_http_refreshtoken_post() {
     std::string body = "grant_type=refresh_token"
                        "&refresh_token=" +
                        uri_encode(refresh_token) + "&client_id=" +
-                       uri_encode(config.data.read().value.client_id);
+                       uri_encode(config.data.read()->client_id);
     http::request<http::string_body> req{ http::verb::post, "/api/token", 11 };
     req.set(http::field::host, "accounts.spotify.com");
     req.set(http::field::content_type, "application/x-www-form-urlencoded");

@@ -1,23 +1,26 @@
 module;
 #include <sys/inotify.h>
 #include <fcntl.h>
-#include <boost/asio.hpp>
+#include <limits.h>
+#include <boost/asio/awaitable.hpp>
 module config.watcher;
 
 import std;
 import log;
 
-ConfigWatcher::ConfigWatcher(const std::string &path,
-                             boost::asio::io_context &ioc)
+ConfigWatcher::ConfigWatcher(const std::string &path, asio::io_context &ioc)
         : inotify_fd(inotify_init1(IN_NONBLOCK | IN_CLOEXEC)), desc(ioc) {
     if (inotify_fd < 0) {
-        throw std::runtime_error("inotify_init1 failed");
+        Log::instance().error("inotify_init1 failed: {}", std::strerror(errno));
+        return;
     }
     desc.assign(inotify_fd);
     const uint32_t mask = IN_CLOSE_WRITE | IN_MOVED_TO;
     wd = inotify_add_watch(inotify_fd, path.c_str(), mask);
     if (wd < 0) {
-        throw std::runtime_error("inotify_add_watch failed for " + path);
+        Log::instance().error("inotify_add_watch failed for {}: {}", path,
+                              std::strerror(errno));
+        return;
     }
 }
 
@@ -27,12 +30,12 @@ void ConfigWatcher::setOnChange(std::function<void()> func) {
     handle_event = func;
 }
 
-boost::asio::awaitable<void> ConfigWatcher::watch_inotify() {
+asio::awaitable<void> ConfigWatcher::watch_inotify() {
     constexpr size_t BUF_SIZE = sizeof(inotify_event) + NAME_MAX + 1;
     alignas(inotify_event) char buf[BUF_SIZE];
     for (;;) {
-        std::size_t n = co_await desc.async_read_some(
-                boost::asio::buffer(buf), boost::asio::use_awaitable);
+        std::size_t n = co_await desc.async_read_some(asio::buffer(buf),
+                                                      asio::use_awaitable);
         Log::instance().info("ConfigWatcher: watch_inotify read {} bytes", n);
         std::size_t offset = 0;
         while (offset < n) {
