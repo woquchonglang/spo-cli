@@ -12,6 +12,7 @@ Log::Log() {
     logger->set_level(spdlog::level::debug);
     this->info("log init");
     logger->flush_on(spdlog::level::trace);
+    spdlog::flush_every(std::chrono::seconds(2));
 }
 
 Log::~Log() {
