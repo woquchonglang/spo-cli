@@ -9,10 +9,13 @@ import kittyImageComponent;
 import spotifyWebAPI;
 import event;
 import proc;
+import :visualizer;
 Ui::Ui(Config &config, SpotifyData &spotifyData)
         : screen(App::FullscreenAlternateScreen())
         , config(config)
         , spotifyData(spotifyData) {
+    g_visualizer = std::make_unique<Visualizer>();
+    g_visualizer->register_cb();
 
 
     auto cover = Renderer([&] {
@@ -192,6 +195,26 @@ asio::awaitable<void> Ui::render() {
     auto tab_toggle = Toggle(&tab_values, &tab_drawn);
 
     auto tab_container = Container::Tab({ menu, user_home }, &tab_drawn);
+ftxui::Element Ui::render_cava() {
+    auto bars = g_visualizer->bars.read().value;
+    ftxui::Elements columns;
+    for (int i = 0; i < bars.size() / 2; i++) {
+        double v = (bars[i] + bars[bars.size() / 2 + i]) /
+                   2.0; // left and right bars
+        if (v < 0.01)
+            v = 0;
+        auto inter_color =
+                Color::Interpolate(v, config.data.read()->theme.visualizer_high,
+                                   config.data.read()->theme.visualizer_low);
+        columns.push_back(ftxui::gaugeUp(v) | color(inter_color) |
+                          ftxui::size(ftxui::WIDTH, ftxui::EQUAL, 2));
+        columns.push_back(ftxui::text("") |
+                          ftxui::size(ftxui::WIDTH, ftxui::EQUAL, 1));
+    }
+    auto hold = vtext("       ");
+    columns.push_back(hold);
+    return ftxui::hbox(std::move(columns));
+}
 
     auto container = Container::Vertical({ tab_toggle, tab_container });
 

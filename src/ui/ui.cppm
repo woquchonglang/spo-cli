@@ -19,6 +19,7 @@ public:
     asio::awaitable<void> render();
     asio::awaitable<void> renderLogin();
 
+    Element render_cava();
 private:
     App screen = App::FullscreenAlternateScreen();
 };
