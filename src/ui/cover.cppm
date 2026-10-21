@@ -1,9 +1,9 @@
 module;
-export module ui.cover;
+module ui:cover;
 
 import std;
 
-export namespace Cover {
+namespace Cover {
 // clang-format off
 constexpr std::array<std::string_view, 5> cover0 = { R"(   _____ ____  ____        ________    ____)",
                                                      R"(  / ___// __ \/ __ \      / ____/ /   /  _/)",

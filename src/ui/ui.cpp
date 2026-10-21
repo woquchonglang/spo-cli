@@ -9,6 +9,7 @@ import event;
 import proc;
 import :visualizer;
 import :progressGuage;
+import :cover;
 Ui::Ui(Config &config, SpotifyData &spotifyData)
         : screen(App::FullscreenAlternateScreen())
         , config(config)
