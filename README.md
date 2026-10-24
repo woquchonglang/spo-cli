@@ -64,6 +64,10 @@ login_redirect_uri
 - openssl
 - liburing
 
+```sh
+sudo pacman -S mold sdbus-cpp python pkgconf openssl alsa-lib fftw boost boost-libs liburing ccache cargo
+git submodule update --init --recursive
+```
 
 ```
 touch default.toml

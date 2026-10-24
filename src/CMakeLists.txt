@@ -23,14 +23,15 @@ target_include_directories(spo_src PRIVATE ${CMAKE_SOURCE_DIR}/lib/asio/include 
 add_library(caches INTERFACE)
 target_include_directories(caches INTERFACE ${CMAKE_SOURCE_DIR}/lib/caches/include)
 
-add_library(stb INTERFACE)
 add_compile_definitions(STB_IMAGE_IMPLEMENTATION)
 add_compile_definitions(STB_IMAGE_RESIZE_IMPLEMENTATION)
 
 add_library(cava STATIC ${CMAKE_SOURCE_DIR}/lib/cava/cavacore.c)
 target_include_directories(cava PUBLIC ${CMAKE_SOURCE_DIR}/lib/cava)
 
-target_include_directories(caches INTERFACE ${CMAKE_SOURCE_DIR}/lib/stb)
+# target_include_directories(caches INTERFACE ${CMAKE_SOURCE_DIR}/lib/stb)
+
+target_include_directories(spo_src PUBLIC ${CMAKE_SOURCE_DIR}/lib/stb ${CMAKE_SOURCE_DIR}/lib/stb_image_resize)
 
 target_compile_definitions(tomlplusplus_modules PRIVATE TOML_EXCEPTIONS=0)
 

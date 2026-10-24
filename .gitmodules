@@ -49,3 +49,6 @@
 [submodule "lib/SQLiteCpp"]
 	path = lib/SQLiteCpp
 	url = https://github.com/SRombauts/SQLiteCpp.git
+[submodule "lib/stb_image_resize"]
+	path = lib/stb_image_resize
+	url = https://github.com/nothings/stb_image_resize.git
