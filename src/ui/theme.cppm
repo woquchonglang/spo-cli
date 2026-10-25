@@ -12,7 +12,7 @@ public:
     void update(::Image data);
 
     bool follow_picker;
-    Component_theme theme;
+    config::Component_theme theme;
     ColorPalette palette;
 };
 

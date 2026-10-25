@@ -106,11 +106,12 @@ std::string extract_code(const std::string &target) {
     return target.substr(pos, end - pos);
 }
 
-SpotifyAuthPKCE::SpotifyAuthPKCE(::asio::io_context &ioc, const Config &config)
+SpotifyAuthPKCE::SpotifyAuthPKCE(::asio::io_context &ioc,
+                                 const config::Config &config)
         : config(config), ioc(ioc), ctx(ssl::context::tls_client) {
     ctx.set_default_verify_paths();
     ctx.set_verify_mode(ssl::verify_peer);
-    fs::path cache_path = expand_shell_path(config.data.read()->cache_path);
+    fs::path cache_path = expand_shell_path(config.data.read()->cache.path);
     cache_file = cache_path / "token.json";
 }
 
@@ -176,8 +177,8 @@ asio::awaitable<bool> SpotifyAuthPKCE::login() {
     codeVerifier = generateRandomString(64);
     auto hashed = sha256(codeVerifier);
     auto codeChallenge = base64encode(hashed);
-    auto client_id = config.data.read()->client_id;
-    auto redirect_url = config.data.read()->login_redirect_url;
+    auto client_id = config.data.read()->spotify.client_id;
+    auto redirect_url = config.data.read()->spotify.login_redirect_url;
     auto scope = scopes_to_string(scopes);
 
     cache = loadTokenCache(cache_file);
@@ -217,7 +218,8 @@ asio::awaitable<bool> SpotifyAuthPKCE::login() {
                            codeChallenge +
                            "&redirect_uri=" + uri_encode(redirect_url);
 
-    auto port = parse_port_from_url(config.data.read()->login_redirect_url);
+    auto port =
+            parse_port_from_url(config.data.read()->spotify.login_redirect_url);
     auto server = co_await start_callback_server(port);
 
     std::string cmd = "xdg-open '" + auth_url + "'";
@@ -366,7 +368,7 @@ SpotifyAuthPKCE::async_http_refreshtoken_post() {
     std::string body = "grant_type=refresh_token"
                        "&refresh_token=" +
                        uri_encode(refresh_token) + "&client_id=" +
-                       uri_encode(config.data.read()->client_id);
+                       uri_encode(config.data.read()->spotify.client_id);
     http::request<http::string_body> req{ http::verb::post, "/api/token", 11 };
     req.set(http::field::host, "accounts.spotify.com");
     req.set(http::field::content_type, "application/x-www-form-urlencoded");

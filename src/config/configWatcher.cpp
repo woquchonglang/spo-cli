@@ -8,7 +8,9 @@ module config.watcher;
 import std;
 import log;
 
-ConfigWatcher::ConfigWatcher(const std::string &path, asio::io_context &ioc)
+using namespace config;
+
+Watcher::Watcher(const std::string &path, asio::io_context &ioc)
         : inotify_fd(inotify_init1(IN_NONBLOCK | IN_CLOEXEC)), desc(ioc) {
     if (inotify_fd < 0) {
         Log::instance().error("inotify_init1 failed: {}", std::strerror(errno));
@@ -24,13 +26,11 @@ ConfigWatcher::ConfigWatcher(const std::string &path, asio::io_context &ioc)
     }
 }
 
-ConfigWatcher::~ConfigWatcher() { inotify_rm_watch(inotify_fd, wd); }
+Watcher::~Watcher() { inotify_rm_watch(inotify_fd, wd); }
 
-void ConfigWatcher::setOnChange(std::function<void()> func) {
-    handle_event = func;
-}
+void Watcher::setOnChange(std::function<void()> func) { handle_event = func; }
 
-asio::awaitable<void> ConfigWatcher::watch_inotify() {
+asio::awaitable<void> Watcher::watch_inotify() {
     constexpr size_t BUF_SIZE = sizeof(inotify_event) + NAME_MAX + 1;
     alignas(inotify_event) char buf[BUF_SIZE];
     for (;;) {

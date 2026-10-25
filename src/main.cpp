@@ -16,9 +16,9 @@ int main() {
     asio::io_context ioc;
     asio::thread_pool backend_thread(4);
 
-    Config config;
+    config::Config config;
     Log::instance().info("config init");
-    ConfigWatcher watcher(config.config_directory, ioc);
+    config::Watcher watcher(config.config_directory, ioc);
     asio::co_spawn(
             ioc,
             [&watcher]() -> asio::awaitable<void> {

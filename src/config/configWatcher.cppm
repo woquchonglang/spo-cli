@@ -4,10 +4,12 @@ export module config.watcher;
 import std;
 import asio;
 
-export class ConfigWatcher {
+namespace config {
+
+export class Watcher {
 public:
-    ConfigWatcher(const std::string &path, asio::io_context &ioc);
-    ~ConfigWatcher();
+    Watcher(const std::string &path, asio::io_context &ioc);
+    ~Watcher();
     asio::awaitable<void> watch_inotify();
     void setOnChange(std::function<void()> func);
 
@@ -18,3 +20,5 @@ private:
     int wd = -1;
     std::function<void()> handle_event;
 };
+
+}

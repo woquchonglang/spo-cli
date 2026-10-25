@@ -7,7 +7,8 @@ import magic_enum;
 import event;
 import log;
 
-SpotifyClient::SpotifyClient(asio::io_context &ioc, const Config &config,
+SpotifyClient::SpotifyClient(asio::io_context &ioc,
+                             const config::Config &config,
                              asio::thread_pool &pool)
         : api(ioc, nullptr, data)
         , auth(ioc, config)

@@ -65,7 +65,7 @@ login_redirect_uri
 - liburing
 
 ```sh
-sudo pacman -S mold sdbus-cpp python pkgconf openssl alsa-lib fftw boost boost-libs liburing ccache cargo
+sudo pacman -S mold sdbus-cpp python pkgconf openssl alsa-lib fftw boost boost-libs liburing ccache cargo pipewire-alsa
 git submodule update --init --recursive
 ```
 

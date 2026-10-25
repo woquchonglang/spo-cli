@@ -1,3 +1,4 @@
 {
     "lldb.launch.terminal": "external",
+    "terminal.external.linuxExec": "kitty"
 }

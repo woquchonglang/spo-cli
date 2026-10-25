@@ -5,6 +5,29 @@ import std;
 import ftxui;
 
 export {
+    namespace config {
+
+    struct Spotify {
+        std::string client_id;
+        std::string login_redirect_url;
+    };
+
+    struct Cache {
+        std::string path;
+    };
+
+    struct Mpris {
+        bool enable = false;
+    };
+
+    struct Proc {
+        bool enable = false;
+    };
+
+    struct Log {
+        bool enable = false;
+    };
+
     using namespace ftxui;
     struct Component_theme {
         Color progressline_fg;
@@ -15,22 +38,15 @@ export {
         Color lyrics_bg;
     };
 
-    struct ConfigData {
-        std::string client_id;
-        std::string login_redirect_url;
-
-        std::string soloist_api_key;
-
-        std::string cache_path;
-
-        bool mpris_enable = false;
-
-        bool proc_enable = false;
-
-        bool log_enable = false;
-
+    struct Data {
+        Spotify spotify;
+        Cache cache;
+        Mpris mpris;
+        Proc proc;
+        Log log;
         // theme
         std::string preset;
         Component_theme theme;
     };
+    }
 }

@@ -7,6 +7,7 @@ import :defaults;
 import magic_enum;
 import log;
 
+using namespace config;
 using namespace std::literals; // for ""sv
 
 namespace magic_enum::customize {
@@ -36,7 +37,7 @@ Config::Config() {
     if (fs::exists(config_path)) {
         auto new_config = parse(config_path.string());
         if (new_config.has_value()) {
-            data.write(std::make_shared<ConfigData>(std::move(*new_config)));
+            data.write(std::make_shared<Data>(std::move(*new_config)));
             return;
         }
     }
@@ -52,26 +53,25 @@ Config::Config() {
     if (std::filesystem::exists(config_path)) {
         auto user_config = parse(config_path.string());
         if (user_config.has_value()) {
-            data.write(std::make_shared<ConfigData>(std::move(*user_config)));
+            data.write(std::make_shared<Data>(std::move(*user_config)));
             return;
         } else {
             std::println("error: {}", user_config.error());
             throw;
         }
     }
-    DefaultConfig default_config(config_path);
-    data.write(std::make_shared<ConfigData>(std::move(default_config.get())));
+    Default default_config(config_path);
+    data.write(std::make_shared<Data>(std::move(default_config.get())));
     return;
 }
 
 Config::~Config() {}
 
-std::expected<ConfigData, std::string>
-Config::parse(std::string_view config_path) {
+std::expected<Data, std::string> Config::parse(std::string_view config_path) {
     toml::parse_result config = toml::parse_file(config_path);
     if (!config) {
         auto error = config.error();
-        Log::instance().error(
+        ::Log::instance().error(
                 "config parse failed {} in {}:{}", error.description(),
                 error.source().path ? *error.source().path : "<unknown>",
                 error.source().begin.line);
@@ -84,20 +84,19 @@ Config::parse(std::string_view config_path) {
     }
     notify_msg.write(std::make_shared<std::string>(std::move("")));
 
-    ConfigData cfg;
+    Data cfg;
 
-    cfg.client_id = config["spotify"]["client_id"].value_or(""sv);
-    cfg.login_redirect_url =
+    cfg.spotify.client_id = config["spotify"]["client_id"].value_or(""sv);
+    cfg.spotify.login_redirect_url =
             config["spotify"]["login_redirect_url"].value_or(""sv);
-    cfg.soloist_api_key = config["soloist"]["api_key"].value_or(""sv);
-    cfg.cache_path =
+    cfg.cache.path =
             config["cache"]["path"].value_or("$HOME/.config/spo-cli"sv);
 
-    cfg.mpris_enable = config["mpris"]["enable"].value_or(false);
+    cfg.mpris.enable = config["mpris"]["enable"].value_or(false);
 
-    cfg.proc_enable = config["proc"]["enable"].value_or(false);
+    cfg.proc.enable = config["proc"]["enable"].value_or(false);
 
-    cfg.log_enable = config["log"]["enable"].value_or(false);
+    cfg.log.enable = config["log"]["enable"].value_or(false);
 
     // theme
     cfg.preset = config["theme"]["preset"].value_or(""sv);
@@ -121,7 +120,7 @@ Config::parse(std::string_view config_path) {
 void Config::refresh() {
     auto new_config = parse(config_path.string());
     if (new_config.has_value()) {
-        data.write(std::make_shared<ConfigData>(std::move(*new_config)));
+        data.write(std::make_shared<Data>(std::move(*new_config)));
     } else {
         std::cerr << "Failed to refresh config from " << config_path
                   << std::endl;

@@ -13,7 +13,7 @@ export import spotify.data;
 
 export class SpotifyClient {
 public:
-    SpotifyClient(asio::io_context &ioc, const Config &config,
+    SpotifyClient(asio::io_context &ioc, const config::Config &config,
                   asio::thread_pool &pool);
     ~SpotifyClient() = default;
 

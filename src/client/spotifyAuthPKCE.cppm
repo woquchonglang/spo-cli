@@ -46,7 +46,7 @@ struct TokenCache {
 
 export class SpotifyAuthPKCE {
 public:
-    SpotifyAuthPKCE(asio::io_context &ioc, const Config &config);
+    SpotifyAuthPKCE(asio::io_context &ioc, const config::Config &config);
     ~SpotifyAuthPKCE();
     asio::awaitable<bool> login();
     std::shared_ptr<std::string> getAccessToken() { return access_token; }
@@ -65,7 +65,7 @@ private:
     asio::awaitable<nlohmann::json> async_http_refreshtoken_post();
 
 private:
-    const Config &config;
+    const config::Config &config;
     std::string codeVerifier;
     std::shared_ptr<std::string> access_token = std::make_shared<std::string>();
     std::string refresh_token;

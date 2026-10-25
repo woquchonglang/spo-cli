@@ -19,7 +19,8 @@ enum class TermSize { Large, Medium, Small };
 
 export class Ui {
 public:
-    Ui(Config &config, SpotifyData &spotifyData);
+    Ui(config::Config &config, SpotifyData &spotifyData);
+    ~Ui();
     void reConfig();
 
     asio::awaitable<void> render();
@@ -63,7 +64,7 @@ private:
     Component notify_section;
     std::vector<std::string> notify_msg;
 
-    Config &config;
+    config::Config &config;
 
     // term
     Terminal::Quirks quirks;

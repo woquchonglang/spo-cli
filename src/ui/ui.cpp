@@ -15,7 +15,7 @@ import :cover;
 import :kittyImageComponent;
 import magic_enum;
 
-Ui::Ui(Config &config, SpotifyData &spotifyData)
+Ui::Ui(config::Config &config, SpotifyData &spotifyData)
         : screen(App::FullscreenAlternateScreen())
         , config(config)
         , spotifyData(spotifyData) {
@@ -34,6 +34,10 @@ Ui::Ui(Config &config, SpotifyData &spotifyData)
     render_search();
     render_image();
     render_notify();
+}
+
+Ui::~Ui(){
+    screen.Exit();
 }
 
 asio::awaitable<void> Ui::renderLogin() {
@@ -306,8 +310,6 @@ asio::awaitable<void> Ui::render() {
         if (ec)
             co_return;
     }
-
-    screen.Exit();
     Log::instance().info("ui render exit");
 }
 
@@ -600,7 +602,7 @@ void Ui::render_image() {
                                           theme_manager.palette.colors[0].b,
                                           255);
                 _data.theme.lyrics_fg = color;
-                config.data.write(std::make_shared<ConfigData>(_data));
+                config.data.write(std::make_shared<config::Data>(_data));
             }
         }
         return image_component_->Render();
@@ -626,4 +628,4 @@ void Ui::render_notify() {
 }
 
 
-void Ui::reConfig() { render_proc(config.data.read()->proc_enable); }
+void Ui::reConfig() { render_proc(config.data.read()->proc.enable); }

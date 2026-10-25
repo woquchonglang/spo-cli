@@ -74,8 +74,8 @@ public:
     }
 
 private:
-    fs::path dir_ = std::filesystem::path(getenv("HOME")) / ".config" /
-                    "spo-cli" / ".cache" / "images";
+    fs::path dir_ = fs::path(getenv("HOME")) / ".config" / "spo-cli" /
+                    ".cache" / "images";
 
     fs::path path_for(const std::string &key) const {
         std::hash<std::string> h;
