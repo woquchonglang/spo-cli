@@ -1,13 +1,17 @@
 use librespot::{
     connect::{ConnectConfig, Spirc},
     core::{
-        Error, authentication::Credentials, cache::Cache, config::SessionConfig, session::Session,
+        Error,
+        authentication::Credentials,
+        cache::Cache,
+        config::{DeviceType, SessionConfig},
+        session::Session,
     },
     playback::mixer::MixerConfig,
     playback::{
         audio_backend,
         audio_backend::{Sink, SinkResult},
-        config::{AudioFormat, PlayerConfig},
+        config::{AudioFormat, Bitrate, PlayerConfig},
         convert::Converter,
         decoder::AudioPacket,
         mixer,
@@ -158,9 +162,21 @@ fn play_backends() -> Box<SpotifyContext> {
     runtime()
         .block_on(async {
             let session_config = SessionConfig::default();
-            let player_config = PlayerConfig::default();
+            let player_config = PlayerConfig {
+                bitrate: Bitrate::Bitrate320,
+                ..Default::default()
+            };
             let audio_format = AudioFormat::default();
-            let connect_config = ConnectConfig::default();
+            let volume = (70.0 / 100.0 * 65535.0) as u16;
+            let connect_config = ConnectConfig {
+                name: "spo-cli".to_string(),
+                device_type: DeviceType::Computer,
+                initial_volume: volume,
+                is_group: false,
+                disable_volume: false,
+                volume_steps: 64,
+                emit_set_queue_events: false,
+            };
             let mixer_config = MixerConfig::default();
 
             let sink_builder = audio_backend::find(None).unwrap();
