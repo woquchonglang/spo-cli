@@ -4,7 +4,7 @@ module spotify.data;
 import event;
 
 int SpotifyData::playback_progress() {
-    static bool query_update = false;
+    static int query_count = 0;
 
     auto guard = currentlyPlayTrack.read();
     if (!guard.value.isPlaying) {
@@ -24,12 +24,13 @@ int SpotifyData::playback_progress() {
     }
 
     if (total_progress < duration_ms) {
-        query_update = false;
-    } else if (total_progress == duration_ms && !query_update) {
-        eventQueue.enqueue(SPOCLI::Event::GetCurrentlyPlayingTrack);
-        query_update = true;
+        query_count = 0;
     } else if (total_progress > duration_ms) {
         total_progress = duration_ms;
+        if (query_count < 2) {
+            eventQueue.enqueue(SPOCLI::Event::GetCurrentlyPlayingTrack);
+            query_count++;
+        }
     }
     return total_progress;
 }

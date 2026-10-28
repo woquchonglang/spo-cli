@@ -38,6 +38,7 @@ public:
     void render_current_playing_song();
     void render_search();
     void render_image();
+    void render_image_lyrics();
     void render_notify();
 
     App screen;
@@ -72,6 +73,8 @@ private:
     TermSize term_size = TermSize::Medium;
     TermSize last_term_size = TermSize::Medium;
 
+    // image
+    Component image_lycics_element;
 
     SpotifyData &spotifyData;
 

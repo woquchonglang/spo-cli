@@ -377,7 +377,7 @@ SpotifyAuthPKCE::async_http_refreshtoken_post() {
     auto res = co_await client_read("accounts.spotify.com", "443", ctx, req);
     auto result = res.result_int();
     nlohmann::json response;
-    if (result == 200) {
+    if (result == 200 && res.body().size() != 0) {
         response = nlohmann::json::parse(
                 beast::buffers_to_string(res.body().data()));
     } else

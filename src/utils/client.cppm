@@ -50,23 +50,21 @@ client_read(std::string host, std::string port, ssl::context &ctx,
     }
 
     // Make the connection on the IP address we get from a lookup
-    try {
-        co_await beast::get_lowest_layer(stream).async_connect(
-                v4_endpoints, asio::cancel_after(10s));
-    } catch (const boost::system::system_error &e) {
-        Log::instance().error("connect failed: {}", e.what());
+    auto [connect_ec, _] =
+            co_await beast::get_lowest_layer(stream).async_connect(
+                    v4_endpoints, asio::cancel_after(10s, asio::as_tuple));
+    if (connect_ec) {
+        Log::instance().error("connect failed: {}", connect_ec.message());
         co_return http::response<http::dynamic_body>{};
     }
 
     // Perform the SSL handshake
-    try {
-        co_await stream.async_handshake(ssl::stream_base::client,
-                                        asio::cancel_after(10s));
-    } catch (const boost::system::system_error &e) {
-        Log::instance().error("handshake failed: {}", e.what());
+    auto [handshake_ec] = co_await stream.async_handshake(
+            ssl::stream_base::client, asio::cancel_after(10s, asio::as_tuple));
+    if (handshake_ec) {
+        Log::instance().error("handshake failed: {}", handshake_ec.message());
         co_return http::response<http::dynamic_body>{};
     }
-
 
     // Send the HTTP request to the remote host
     co_await http::async_write(stream, req, asio::cancel_after(10s));

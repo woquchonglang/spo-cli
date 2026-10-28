@@ -202,7 +202,6 @@ fn play_backends() -> Box<SpotifyContext> {
                 let mut channel = player.get_player_event_channel();
                 async move {
                     while let Some(event) = channel.recv().await {
-                        eprintln!("got event: {:?}", event);
                         match event {
                             PlayerEvent::Playing { .. } => unsafe {
                                 cpp_player_event_playing_cb();

@@ -33,12 +33,11 @@ Ui::Ui(config::Config &config, SpotifyData &spotifyData)
     render_current_playing_song();
     render_search();
     render_image();
+    render_image_lyrics();
     render_notify();
 }
 
-Ui::~Ui(){
-    screen.Exit();
-}
+Ui::~Ui() { screen.Exit(); }
 
 asio::awaitable<void> Ui::renderLogin() {
     Log::instance().info("renderLogin init");
@@ -196,32 +195,10 @@ asio::awaitable<void> Ui::render() {
     auto container_wrapper = container | Modal(help_section, &help_show);
 
     // main ui
-    auto renderer = Renderer(container_wrapper, [&] {
-        Element image_lycics_com;
-        if (term_direction == TermDirection::Horizontal) {
-            image_lycics_com =
-                    hbox({ image_box->Render(),
-                           separatorEmpty() | size(WIDTH, EQUAL, 6),
-                           vbox({
-                                   filler(),
-                                   curlyrics->Render() | size(WIDTH, EQUAL, 40),
-                                   filler(),
-                           }) }) |
-                    center;
-        } else {
-            image_lycics_com =
-                    vbox({ image_box->Render(),
-                           separatorEmpty() | size(HEIGHT, EQUAL, 6),
-                           vbox({
-                                   filler(),
-                                   curlyrics->Render() | size(WIDTH, EQUAL, 40),
-                                   filler(),
-                           }) }) |
-                    center;
-        }
+    auto renderer = Renderer(container_wrapper, [&]() -> Element {
         return vbox({ notify_section->Render() | align_right, filler(),
                       // container_wrapper->Render() | center,
-                      image_lycics_com, filler(),
+                      image_lycics_element->Render(), filler(),
                       current_playing_song->Render() | center,
                       hbox({ filler(), proc_section->Render() }) });
     });
@@ -335,9 +312,6 @@ void Ui::updateFrame() {
             term_size = TermSize::Medium;
         }
     }
-    // Log::instance().info("term dimy:{},dimx:{},size:{},dire:{}", size.dimy,
-    //                      size.dimx, magic_enum::enum_name(term_size),
-    //                      magic_enum::enum_name(term_direction));
 }
 
 ftxui::Element Ui::render_cava() {
@@ -399,7 +373,6 @@ void Ui::render_help() {
         { "a", "add this song to current queue" },
     };
 
-
     static auto left_column = Renderer([&] {
         Elements children = {};
         children.push_back(
@@ -433,28 +406,12 @@ void Ui::render_help() {
 }
 
 void Ui::render_curlyrics() {
-    static std::string last_lyrics_request_id;
     curlyrics = Renderer([&]() -> Element {
-        static int tick = 0;
-
-        {
-            auto guard1 = spotifyData.currentlyPlayTrack.read();
-            if (guard1.value.currently_playing.name == "") {
-                return emptyElement();
-            }
-
-            if (last_lyrics_request_id != guard1.value.currently_playing.id) {
-                eventQueue.enqueue(SPOCLI::Event::GetLyrics);
-                last_lyrics_request_id = guard1.value.currently_playing.id;
-                tick = 0;
-            }
-        }
-
         std::vector<LyricLine> lyricLine;
         {
             lyricLine = spotifyData.curLyric.read().value;
             if (lyricLine.size() == 0) {
-                return text("");
+                return emptyElement();
             }
         }
 
@@ -479,7 +436,7 @@ void Ui::render_curlyrics() {
                                  color(config.data.read()->theme.lyrics_fg) |
                                          bold :
                                  color(config.data.read()->theme.lyrics_bg);
-            rows.push_back(text(lyricLine[i].text) | style);
+            rows.push_back(paragraph(lyricLine[i].text) | style);
         }
 
         return vbox(std::move(rows));
@@ -501,16 +458,26 @@ void Ui::render_username() {
 void Ui::render_current_playing_song() {
     static bool request_currently_playing_track = false;
     current_playing_song = Renderer([this]() -> Element {
+        std::string device;
+        {
+            auto devices = spotifyData.devices.read();
+            if (devices.value.size() > 1) {
+                device = devices.value[1].name;
+            }
+        }
         auto guard2 = spotifyData.currentlyPlayTrack.read();
 
         if (guard2.value.currently_playing.duration_ms != 0) {
             std::string isPlaying = guard2.value.isPlaying ? "playing" : "stop";
+            if (!device.empty()) {
+                device = device + ": " + isPlaying;
+            }
             auto progress_ms = spotifyData.playback_progress();
             return vbox(
                     { render_cava() | flex,
                       text(isPlaying + ": " +
-                           guard2.value.currently_playing.name + " " +
-                           guard2.value.currently_playing.atrists_name[0] +
+                           // guard2.value.currently_playing.name + " " +
+                           // guard2.value.currently_playing.atrists_name[0] +
                            "[" + Time::format_duration(progress_ms) + "/" +
                            Time::format_duration(
                                    guard2.value.currently_playing.duration_ms) +
@@ -602,6 +569,7 @@ void Ui::render_image() {
                                           theme_manager.palette.colors[0].b,
                                           255);
                 _data.theme.lyrics_fg = color;
+                _data.theme.progressline_fg = color;
                 config.data.write(std::make_shared<config::Data>(_data));
             }
         }
@@ -624,6 +592,66 @@ void Ui::render_notify() {
             return element;
         }
         return emptyElement();
+    });
+}
+
+void Ui::render_image_lyrics() {
+    static std::string last_lyrics_request_id;
+    image_lycics_element = Renderer([this]() -> Element {
+        {
+            auto guard1 = spotifyData.currentlyPlayTrack.read();
+            if (last_lyrics_request_id != guard1.value.currently_playing.id) {
+                eventQueue.enqueue(SPOCLI::Event::GetLyrics);
+                // FIX: need some way to get state change and update add state when not playing in librespot
+                image_rendered = false;
+                last_lyrics_request_id = guard1.value.currently_playing.id;
+            }
+        }
+        Component image_and_name_com;
+        int lyrics_size = 0;
+        {
+            auto lyricLine = spotifyData.curLyric.read().value;
+            lyrics_size = lyricLine.size();
+        }
+        image_and_name_com = Renderer([this]() -> Element {
+            std::string song_name;
+            std::string atrists_name;
+            {
+                auto guard = spotifyData.currentlyPlayTrack.read();
+                if (!guard.value.currently_playing.name.empty()) {
+                    song_name = guard.value.currently_playing.name;
+                    atrists_name =
+                            guard.value.currently_playing.atrists_name[0];
+                    return vbox({ image_box->Render(), ftxui::separatorEmpty(),
+                                  text(song_name) | bold,
+                                  text(atrists_name) }) |
+                           center;
+                }
+            }
+            return image_box->Render() | center;
+        });
+        if (lyrics_size == 0) {
+            return image_and_name_com->Render();
+        }
+        if (term_direction == TermDirection::Horizontal) {
+            return hbox({ image_and_name_com->Render(),
+                          separatorEmpty() | size(WIDTH, EQUAL, 6),
+                          vbox({
+                                  filler(),
+                                  curlyrics->Render() | size(WIDTH, EQUAL, 40),
+                                  filler(),
+                          }) | size(HEIGHT, EQUAL, 6) }) |
+                   center;
+        } else {
+            return vbox({ image_and_name_com->Render(),
+                          separatorEmpty() | size(HEIGHT, EQUAL, 6),
+                          vbox({
+                                  filler(),
+                                  curlyrics->Render() | size(WIDTH, EQUAL, 40),
+                                  filler(),
+                          }) | size(HEIGHT, EQUAL, 6) }) |
+                   center;
+        }
     });
 }
 
