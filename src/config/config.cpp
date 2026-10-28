@@ -31,8 +31,14 @@ ftxui::Color string_to_color(const std::string &name) {
 }
 
 Config::Config() {
+    // cache path
+
+    cache_path = fs::path(getenv("HOME")) / ".cache" / "spo-cli";
+    if (!fs::exists(cache_path)) {
+        fs::create_directories(cache_path);
+    }
     // current project test
-    config_directory = std::filesystem::path(".config");
+    config_directory = fs::path(".config");
     config_path = config_directory / "spocli.toml";
     if (fs::exists(config_path)) {
         auto new_config = parse(config_path.string());
@@ -43,14 +49,13 @@ Config::Config() {
     }
 
     // application config path
-    config_directory =
-            std::filesystem::path(getenv("HOME")) / ".config" / "spo-cli";
+    config_directory = fs::path(getenv("HOME")) / ".config" / "spo-cli";
     if (!fs::exists(config_directory)) {
-        std::filesystem::create_directories(config_directory);
+        fs::create_directories(config_directory);
     }
 
     config_path = config_directory / "spocli.toml";
-    if (std::filesystem::exists(config_path)) {
+    if (fs::exists(config_path)) {
         auto user_config = parse(config_path.string());
         if (user_config.has_value()) {
             data.write(std::make_shared<Data>(std::move(*user_config)));
@@ -89,8 +94,6 @@ std::expected<Data, std::string> Config::parse(std::string_view config_path) {
     cfg.spotify.client_id = config["spotify"]["client_id"].value_or(""sv);
     cfg.spotify.login_redirect_url =
             config["spotify"]["login_redirect_url"].value_or(""sv);
-    cfg.cache.path =
-            config["cache"]["path"].value_or("$HOME/.config/spo-cli"sv);
 
     cfg.mpris.enable = config["mpris"]["enable"].value_or(false);
 

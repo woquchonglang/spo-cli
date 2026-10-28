@@ -22,6 +22,7 @@ public:
 
     fs::path config_path;
     fs::path config_directory;
+    fs::path cache_path;
 };
 
 }

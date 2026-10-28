@@ -111,8 +111,7 @@ SpotifyAuthPKCE::SpotifyAuthPKCE(::asio::io_context &ioc,
         : config(config), ioc(ioc), ctx(ssl::context::tls_client) {
     ctx.set_default_verify_paths();
     ctx.set_verify_mode(ssl::verify_peer);
-    fs::path cache_path = expand_shell_path(config.data.read()->cache.path);
-    cache_file = cache_path / "token.json";
+    cache_file = config.cache_path / "token.json";
 }
 
 SpotifyAuthPKCE::~SpotifyAuthPKCE() {}

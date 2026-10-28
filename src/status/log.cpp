@@ -9,9 +9,14 @@ namespace fs = std::filesystem;
 
 Log::Log() {
     spdlog::init_thread_pool(8192, 1);
-    fs::path dir = fs::path(getenv("HOME")) / ".config" / "spo-cli" / "log";
+    fs::path log_dir =
+            fs::path(getenv("HOME")) / ".local" / "state" / "spo-cli";
+    if (!fs::exists(log_dir)) {
+        fs::create_directories(log_dir);
+    }
+    fs::path log_file = log_dir / "log";
     logger = spdlog::basic_logger_mt<spdlog::async_factory>("async_file_logger",
-                                                            dir, true);
+                                                            log_file, true);
     logger->set_pattern("[%H:%M:%S.%e] [%^%l%$] %v");
     logger->set_level(spdlog::level::debug);
     this->info("log init");

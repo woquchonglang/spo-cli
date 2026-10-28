@@ -30,7 +30,6 @@ public:
 
         cfg.spotify.client_id = SPOTIFY_CLIENT_ID;
         cfg.spotify.login_redirect_url = "http://127.0.0.1:8989/login";
-        cfg.cache.path = "$HOME/.config/spo-cli";
         cfg.preset = "follow";
 
         rfl::toml::save(config_path.string(), cfg);

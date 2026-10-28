@@ -12,7 +12,7 @@ SpotifyClient::SpotifyClient(asio::io_context &ioc,
                              asio::thread_pool &pool)
         : api(ioc, nullptr, data)
         , auth(ioc, config)
-        , cache()
+        , cache(config.cache_path.string())
         , librespot(pool, data) {
     initDataFromCache();
 

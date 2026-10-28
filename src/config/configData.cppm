@@ -12,10 +12,6 @@ export {
         std::string login_redirect_url;
     };
 
-    struct Cache {
-        std::string path;
-    };
-
     struct Mpris {
         bool enable = false;
     };
@@ -40,7 +36,6 @@ export {
 
     struct Data {
         Spotify spotify;
-        Cache cache;
         Mpris mpris;
         Proc proc;
         Log log;

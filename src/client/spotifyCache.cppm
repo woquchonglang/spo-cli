@@ -6,11 +6,9 @@ export module spotify:cache;
 
 import std;
 
-namespace fs = std::filesystem;
-
 class SpotifyCache {
 public:
-    SpotifyCache();
+    SpotifyCache(const std::string &cache_dir);
     std::optional<std::string> getFromCache(const std::string &key);
 
 
@@ -25,13 +23,12 @@ public:
     }
 
 private:
-    fs::path dir = fs::path(getenv("HOME")) / ".config" / "spo-cli" / ".cache" /
-                   "spotify.db";
     SQLite::Database db;
 };
 
-SpotifyCache::SpotifyCache()
-        : db(dir.string(), SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE) {
+SpotifyCache::SpotifyCache(const std::string &cache_dir)
+        : db(cache_dir + "/spotify.db",
+             SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE) {
     db.exec("CREATE TABLE IF NOT EXISTS api_cache ("
             "  cache_key     TEXT PRIMARY KEY,"
             "  response_body TEXT NOT NULL"
