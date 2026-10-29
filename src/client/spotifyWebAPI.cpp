@@ -79,7 +79,7 @@ asio::awaitable<T> APIImpl::async_http_get(const std::string &host,
     auto res = co_await client_read(host, "443", ctx, std::move(req));
 
     int result = res.result_int();
-    if (result == 200) {
+    if (result == 200 && res.body().size() != 0) {
         nlohmann::json response = nlohmann::json::parse(
                 beast::buffers_to_string(res.body().data()));
         auto data = parse_response<T>(response);

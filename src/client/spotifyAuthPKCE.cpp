@@ -12,6 +12,7 @@ module;
 module spotify;
 
 import http.client;
+import log;
 
 namespace ssl = asio::ssl;
 namespace http = beast::http;
@@ -261,9 +262,12 @@ asio::awaitable<void> SpotifyAuthPKCE::startRefreshTimer() {
     asio::steady_timer timer(co_await asio::this_coro::executor);
     for (;;) {
         auto now = std::chrono::system_clock::now();
-        auto delay = now - cache.value().token_acquire_time;
+        auto expires = std::chrono::seconds{ cache.value().expires_in };
+        auto target = cache.value().token_acquire_time + expires;
+        auto delay = target - now;
         timer.expires_after(
-                std::chrono::duration_cast<std::chrono::milliseconds>(delay));
+                std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                        delay));
         auto [ec] =
                 co_await timer.async_wait(asio::as_tuple(asio::use_awaitable));
         if (ec)
@@ -287,6 +291,7 @@ asio::awaitable<void> SpotifyAuthPKCE::refreshAccessToken() {
                   .expires_in = this->expires_in,
                   .token_acquire_time = std::chrono::system_clock::now() };
         saveTokenCache(cache.value(), cache_file);
+        Log::instance().info("refresh accessToken");
     }
     co_return;
 }
