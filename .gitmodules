@@ -7,9 +7,6 @@
 [submodule "lib/cpp-httplib"]
 	path = lib/cpp-httplib
 	url = https://github.com/yhirose/cpp-httplib.git
-[submodule "lib/CPPify"]
-	path = lib/CPPify
-	url = https://github.com/KielanT/CPPify.git
 [submodule "lib/nlohmann-json"]
 	path = lib/nlohmann-json
 	url = https://github.com/nlohmann/json.git
