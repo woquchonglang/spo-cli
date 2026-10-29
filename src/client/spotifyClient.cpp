@@ -1,6 +1,7 @@
 module;
 #include <rfl/json.hpp>
 #include <rfl.hpp>
+#include <boost/asio/awaitable.hpp>
 module spotify;
 
 import magic_enum;
@@ -13,11 +14,15 @@ SpotifyClient::SpotifyClient(asio::io_context &ioc,
         : api(ioc, nullptr, data)
         , auth(ioc, config)
         , cache(config.cache_path.string())
-        , librespot(pool, data) {
+        , librespot(pool, data)
+        , mpris(std::make_shared<MprisServer>(ioc.get_executor(), data)) {
     initDataFromCache();
 
     librespot.start();
     Log::instance().info("librespot init");
+    if (config.data.read()->mpris.enable) {
+        mpris->start();
+    }
 }
 
 void SpotifyClient::initDataFromCache() {

@@ -1,6 +1,8 @@
 module;
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
+#include <boost/asio/experimental/awaitable_operators.hpp>
+#include <boost/asio/experimental/channel.hpp>
 export module asio;
 
 export namespace asio {
@@ -196,5 +198,13 @@ namespace posix {
 using boost::asio::posix::stream_descriptor;
 }
 
+namespace experimental {
+using boost::asio::experimental::channel;
+}
+
+namespace channel_errc {
+using boost::asio::channel_errc::channel_closed;
+using boost::asio::channel_errc::channel_cancelled;
+}
 
 } // namespace asio

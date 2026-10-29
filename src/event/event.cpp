@@ -28,9 +28,9 @@ asio::awaitable<void> AsyncEventHandler::retry_get_devices() {
         if (has_devices) {
             co_await client.api.TransferPlayback(true);
             co_await client.api.GetCurrentlyPlayingTrack();
-            co_await client.api.AsyncSetPlaybackVolume(70);
             ftxui::animation::RequestAnimationFrame();
-            mpris_notify_spsc.enqueue(MpricEvent::all_update);
+            client.mpris->notify_channel.try_send(boost::system::error_code{},
+                                                  MpricEvent::all_update);
             Log::instance().info("Successfully got available devices");
             co_return;
         }
@@ -108,9 +108,11 @@ asio::awaitable<void> AsyncEventHandler::handle() {
                 break;
                 // player
             case SPOCLI::Event::GetCurrentlyPlayingTrack:
-                client.api.GetCurrentlyPlayingTrack([]() {
+                client.api.GetCurrentlyPlayingTrack([this]() {
                     ftxui::animation::RequestAnimationFrame();
-                    mpris_notify_spsc.enqueue(MpricEvent::all_update);
+                    client.mpris->notify_channel.try_send(
+                            boost::system::error_code{},
+                            MpricEvent::all_update);
                 });
                 break;
             case SPOCLI::Event::GetAvailableDevice:
@@ -121,46 +123,58 @@ asio::awaitable<void> AsyncEventHandler::handle() {
                         []() { ftxui::animation::RequestAnimationFrame(); });
                 break;
             case SPOCLI::Event::SkipToNext: {
-                client.api.skipToNext([]() {
+                client.api.skipToNext([this]() {
                     ftxui::animation::RequestAnimationFrame();
-                    mpris_notify_spsc.enqueue(MpricEvent::all_update);
+                    client.mpris->notify_channel.try_send(
+                            boost::system::error_code{},
+                            MpricEvent::all_update);
                 });
             } break;
             case SPOCLI::Event::SkipToPrevious: {
-                client.api.skipToPrevious([]() {
+                client.api.skipToPrevious([this]() {
                     ftxui::animation::RequestAnimationFrame();
-                    mpris_notify_spsc.enqueue(MpricEvent::all_update);
+                    client.mpris->notify_channel.try_send(
+                            boost::system::error_code{},
+                            MpricEvent::all_update);
                 });
             } break;
             case SPOCLI::Event::SeekRight: {
                 auto guard1 = client.api.spotifyData.currentlyPlayTrack.read();
                 client.api.SeekPosition(
-                        []() {
+                        [this]() {
                             ftxui::animation::RequestAnimationFrame();
-                            mpris_notify_spsc.enqueue(MpricEvent::all_update);
+                            client.mpris->notify_channel.try_send(
+                                    boost::system::error_code{},
+                                    MpricEvent::all_update);
                         },
                         guard1.value.progress_ms + 300);
             } break;
             case SPOCLI::Event::SeekLeft: {
                 auto guard1 = client.api.spotifyData.currentlyPlayTrack.read();
                 client.api.SeekPosition(
-                        []() {
+                        [this]() {
                             ftxui::animation::RequestAnimationFrame();
-                            mpris_notify_spsc.enqueue(MpricEvent::all_update);
+                            client.mpris->notify_channel.try_send(
+                                    boost::system::error_code{},
+                                    MpricEvent::all_update);
                         },
                         guard1.value.progress_ms - 300);
             } break;
             case SPOCLI::Event::Play:
             case SPOCLI::Event::Resume:
-                client.api.ResumePlayback([]() {
+                client.api.ResumePlayback([this]() {
                     ftxui::animation::RequestAnimationFrame();
-                    mpris_notify_spsc.enqueue(MpricEvent::all_update);
+                    client.mpris->notify_channel.try_send(
+                            boost::system::error_code{},
+                            MpricEvent::all_update);
                 });
                 break;
             case SPOCLI::Event::Pause:
-                client.api.PausePlayback([]() {
+                client.api.PausePlayback([this]() {
                     ftxui::animation::RequestAnimationFrame();
-                    mpris_notify_spsc.enqueue(MpricEvent::all_update);
+                    client.mpris->notify_channel.try_send(
+                            boost::system::error_code{},
+                            MpricEvent::all_update);
                 });
                 break;
             case SPOCLI::Event::SetVolumeUp: {
@@ -168,7 +182,9 @@ asio::awaitable<void> AsyncEventHandler::handle() {
                 if (guard.value.device.supports_volume) {
                     auto volume = guard.value.device.volume_percent;
                     client.api.setPlaybackVolume(volume + 10);
-                    mpris_notify_spsc.enqueue(MpricEvent::all_update);
+                    client.mpris->notify_channel.try_send(
+                            boost::system::error_code{},
+                            MpricEvent::all_update);
                 }
             } break;
             case SPOCLI::Event::SetVolumeDown: {
@@ -176,7 +192,9 @@ asio::awaitable<void> AsyncEventHandler::handle() {
                 if (guard.value.device.supports_volume) {
                     auto volume = guard.value.device.volume_percent;
                     client.api.setPlaybackVolume(volume - 10);
-                    mpris_notify_spsc.enqueue(MpricEvent::all_update);
+                    client.mpris->notify_channel.try_send(
+                            boost::system::error_code{},
+                            MpricEvent::all_update);
                 }
             } break;
             case SPOCLI::Event::Exit:
@@ -208,7 +226,8 @@ asio::awaitable<void> AsyncEventHandler::handle() {
         if (play_song_spsc.try_dequeue(uri)) {
             client.api.StartPlayback(ftxui::animation::RequestAnimationFrame,
                                      uri);
-            mpris_notify_spsc.enqueue(MpricEvent::all_update);
+            client.mpris->notify_channel.try_send(boost::system::error_code{},
+                                                  MpricEvent::all_update);
         }
 
         std::string item;

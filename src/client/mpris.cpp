@@ -1,13 +1,25 @@
 module;
 #include <sdbus-c++/sdbus-c++.h>
+#include <boost/system/error_code.hpp>
+#include <boost/asio/awaitable.hpp>
 module mpris;
 
 import event;
+import log;
 
-MprisServer::MprisServer(const SpotifyData &_spotifyData)
-        : spotifyData(_spotifyData) {
+MprisServer::MprisServer(asio::any_io_executor ex,
+                         const SpotifyData &_spotifyData)
+        : ex(ex), spotifyData(_spotifyData), notify_channel(ex) {}
+
+MprisServer::~MprisServer() {
+    notify_channel.close();
+    if (connection) {
+        connection->leaveEventLoop();
+    }
+}
+
+void MprisServer::start() {
     sdbus::ServiceName serviceName{ "org.mpris.MediaPlayer2.spocli" };
-
     try {
         connection = sdbus::createSessionBusConnection(serviceName);
     } catch (const sdbus::Error &e) {
@@ -27,30 +39,44 @@ MprisServer::MprisServer(const SpotifyData &_spotifyData)
 
     connection->enterEventLoopAsync();
 
-    handle_thread =
-            std::jthread([this](std::stop_token st) { handle_notify(); });
+    notify_channel.reset();
+    asio::co_spawn(
+            ex,
+            [self = shared_from_this()]() -> asio::awaitable<void> {
+                co_await self->handle_notify();
+            },
+            asio::detached);
 }
 
-MprisServer::~MprisServer() {
-    mpris_notify_spsc.enqueue(MpricEvent::exit);
+void MprisServer::stop() {
+    notify_channel.cancel();
+    if (object) {
+        object->unregister();
+        object.reset();
+    }
     if (connection) {
         connection->leaveEventLoop();
-    }
-    if (handle_thread.joinable()) {
-        handle_thread.join();
+        connection.reset();
     }
 }
 
-void MprisServer::handle_notify() {
-    while (1) {
-        MpricEvent event;
-        mpris_notify_spsc.wait_dequeue(event);
+asio::awaitable<void> MprisServer::handle_notify() {
+    while (true) {
+        auto [ec, event] = co_await notify_channel.async_receive(
+                asio::as_tuple(asio::use_awaitable));
+        if (ec == asio::channel_errc::channel_cancelled ||
+            ec == asio::channel_errc::channel_cancelled) {
+            co_return;
+        } else if (ec) {
+            Log::instance().error("mpris error: {}", ec.message());
+            co_return;
+        }
         switch (event) {
         case MpricEvent::all_update:
             notifyChanged();
             break;
         case MpricEvent::exit:
-            return;
+            co_return;
         }
     }
 }

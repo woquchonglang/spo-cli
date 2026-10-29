@@ -9,6 +9,7 @@ import :AuthPKCE;
 import :WebAPI;
 import :cache;
 import :librespot;
+import mpris;
 export import spotify.data;
 
 export class SpotifyClient {
@@ -23,6 +24,7 @@ public:
     SpotifyCache cache;
     SpotifyAuthPKCE auth;
     Librespot librespot;
+    std::shared_ptr<MprisServer> mpris;
 
 private:
     void initDataFromCache();
