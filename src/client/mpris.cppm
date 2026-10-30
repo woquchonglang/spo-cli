@@ -1,5 +1,4 @@
 module;
-#include <sdbus-c++/sdbus-c++.h>
 #include <boost/system/error_code.hpp>
 export module mpris;
 
@@ -7,6 +6,7 @@ import std;
 import spotify.data;
 import spsc;
 import asio;
+import sdbus_cpp;
 
 export enum class MpricEvent { all_update, exit };
 
