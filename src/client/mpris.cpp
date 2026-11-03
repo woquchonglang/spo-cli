@@ -1,5 +1,4 @@
 module;
-#include <boost/system/error_code.hpp>
 #include <boost/asio/awaitable.hpp>
 module mpris;
 
@@ -63,7 +62,7 @@ asio::awaitable<void> MprisServer::handle_notify() {
     while (true) {
         auto [ec, event] = co_await notify_channel.async_receive(
                 asio::as_tuple(asio::use_awaitable));
-        if (ec == asio::channel_errc::channel_cancelled ||
+        if (ec == asio::channel_errc::channel_closed ||
             ec == asio::channel_errc::channel_cancelled) {
             co_return;
         } else if (ec) {

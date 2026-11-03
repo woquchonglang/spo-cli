@@ -3,6 +3,7 @@ module;
 #include <boost/asio/ssl.hpp>
 #include <boost/asio/experimental/awaitable_operators.hpp>
 #include <boost/asio/experimental/channel.hpp>
+#include <boost/system.hpp>
 export module asio;
 
 export namespace asio {
@@ -59,6 +60,7 @@ namespace error {
 using boost::asio::error::make_error_code;
 using boost::asio::error::get_ssl_category;
 using boost::asio::error::get_ssl_category;
+using boost::asio::error::operation_aborted;
 }
 
 namespace this_coro {
@@ -208,3 +210,7 @@ using boost::asio::channel_errc::channel_cancelled;
 }
 
 } // namespace asio
+
+export namespace boost::system {
+using boost::system::error_code;
+}
