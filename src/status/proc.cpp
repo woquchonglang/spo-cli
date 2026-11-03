@@ -1,11 +1,13 @@
 module;
 #include <unistd.h>
+#include <boost/asio/experimental/awaitable_operators.hpp>
 #include <boost/asio/awaitable.hpp>
 module proc;
 
 import event;
 
 using namespace Proc;
+using namespace boost::asio::experimental::awaitable_operators;
 
 CpuInfo::CpuInfo() : usage(0) {
     update_time();
@@ -87,15 +89,59 @@ Info::Info() : cpu_info(CpuInfo{}), stat_info(StatmInfo{}) {}
 
 asio::awaitable<void> Info::sample(asio::io_context &ioc) {
     asio::steady_timer timer(ioc);
+    is_enable.emplace(ioc.get_executor());
     while (true) {
-        auto now = std::chrono::steady_clock::now();
-        auto next = cpu_info.read().value.next_tick;
-        if (next > now) {
-            timer.expires_at(next);
-            co_await timer.async_wait(asio::use_awaitable);
+        auto [ec, res] = co_await is_enable.value().async_receive(
+                asio::as_tuple(asio::use_awaitable));
+        if (ec)
+            co_return;
+
+        if (res == 0)
+            continue;
+
+        while (true) {
+            auto now = std::chrono::steady_clock::now();
+            auto next = cpu_info.read().value.next_tick;
+            if (next > now) {
+                timer.expires_at(next);
+            } else {
+                timer.expires_after(std::chrono::milliseconds(0));
+            }
+
+            auto result = co_await (
+                    timer.async_wait(asio::as_tuple(asio::use_awaitable)) ||
+                    is_enable.value().async_receive(
+                            asio::as_tuple(asio::use_awaitable)));
+
+            if (result.index() == 1) {
+                auto [cec, res] = std::get<1>(result);
+                if (cec == asio::channel_errc::channel_cancelled) {
+                    co_return;
+                }
+                if (res == 0) {
+                    break;
+                }
+            } else {
+                auto [tec] = std::get<0>(result);
+                if (tec == asio::error::operation_aborted) {
+                    continue;
+                }
+                if (tec)
+                    co_return;
+            }
+
+            cpu_info.write().value.update_usage();
+            stat_info.write().value.update_memory();
+            eventQueue.enqueue(SPOCLI::Event::Refresh);
         }
-        cpu_info.write().value.update_usage();
-        stat_info.write().value.update_memory();
-        eventQueue.enqueue(SPOCLI::Event::Refresh);
     }
+}
+
+void Info::enable() {
+    if (is_enable.has_value())
+        is_enable.value().try_send(boost::system::error_code{}, 1);
+}
+void Info::disable() {
+    if (is_enable.has_value())
+        is_enable.value().try_send(boost::system::error_code{}, 0);
 }

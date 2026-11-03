@@ -45,11 +45,15 @@ class Info : public Singleton<Info> {
 public:
     RwLock<CpuInfo> cpu_info;
     RwLock<StatmInfo> stat_info;
-
     asio::awaitable<void> sample(asio::io_context &ioc);
+    void enable();
+    void disable();
 
 private:
     Info();
     friend class Singleton<Info>;
+    std::optional<
+            asio::experimental::channel<void(boost::system::error_code, bool)>>
+            is_enable;
 };
 }

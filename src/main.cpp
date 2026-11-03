@@ -22,19 +22,18 @@ int main() {
     asio::co_spawn(
             ioc,
             [&watcher]() -> asio::awaitable<void> {
+                Log::instance().info("config watcher init");
                 co_await watcher.watch_inotify();
             },
             asio::detached);
 
-    Log::instance().info("config watcher init");
-
     asio::co_spawn(
             ioc,
-            [&ioc]() -> asio::awaitable<void> {
+            [&ioc, &config]() -> asio::awaitable<void> {
+                Log::instance().info("proc init");
                 co_await Proc::Info::instance().sample(ioc);
             },
             asio::detached);
-    Log::instance().info("proc init");
 
     SpotifyClient client(ioc, config, backend_thread);
 
@@ -42,6 +41,11 @@ int main() {
     watcher.setOnChange([&config, &ui] {
         config.refresh();
         ui.screen.PostEvent(Event_ReConfig);
+        if (config.data.read()->proc.enable) {
+            Proc::Info::instance().enable();
+        } else {
+            Proc::Info::instance().disable();
+        }
     });
     Log::instance().info("ui visualizer init");
 
