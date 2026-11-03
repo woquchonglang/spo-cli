@@ -32,7 +32,6 @@ ftxui::Color string_to_color(const std::string &name) {
 
 Config::Config() {
     // cache path
-
     cache_path = fs::path(getenv("HOME")) / ".cache" / "spo-cli";
     if (!fs::exists(cache_path)) {
         fs::create_directories(cache_path);
@@ -81,13 +80,12 @@ std::expected<Data, std::string> Config::parse(std::string_view config_path) {
                 error.source().path ? *error.source().path : "<unknown>",
                 error.source().begin.line);
         std::string _notify_msg = std::format(
-                "config error in {}:{}",
+                "Error: config error in {}:{}",
                 error.source().path ? *error.source().path : "<unknown>",
                 error.source().begin.line);
-        notify_msg.write(std::make_shared<std::string>(_notify_msg));
+        ui_notify_msg_cb(_notify_msg);
         return std::unexpected(_notify_msg);
     }
-    notify_msg.write(std::make_shared<std::string>(std::move("")));
 
     Data cfg;
 
@@ -124,8 +122,14 @@ void Config::refresh() {
     auto new_config = parse(config_path.string());
     if (new_config.has_value()) {
         data.write(std::make_shared<Data>(std::move(*new_config)));
+        std::string _notify_msg = std::format("Info: config refresh");
+        ui_notify_msg_cb(_notify_msg);
     } else {
         std::cerr << "Failed to refresh config from " << config_path
                   << std::endl;
     }
+}
+
+void Config::register_ui_notify_msg_cb(std::function<void(std::string)> cb) {
+    ui_notify_msg_cb = cb;
 }

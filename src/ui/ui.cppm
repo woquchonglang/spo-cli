@@ -16,10 +16,16 @@ export auto Event_NextTrack = Event::Special("nextTrack");
 
 enum class TermDirection { Horizontal, Vertical };
 enum class TermSize { Large, Medium, Small };
+enum class NotifyLevel { Error, Info, Warning };
+
+struct NotifyEntry {
+    NotifyLevel level;
+    std::string msg;
+};
 
 export class Ui {
 public:
-    Ui(config::Config &config, SpotifyData &spotifyData);
+    Ui(config::Config &config, SpotifyData &spotifyData, asio::io_context &ioc);
     ~Ui();
     void reConfig();
 
@@ -40,6 +46,9 @@ public:
     void render_image();
     void render_image_lyrics();
     void render_notify();
+
+    void send_notify_msg(const std::string &msg);
+    asio::awaitable<void> start_notify_get();
 
     App screen;
 
@@ -63,7 +72,7 @@ private:
     std::string search_name;
 
     Component notify_section;
-    std::vector<std::string> notify_msg;
+    std::deque<Element> notify_msg;
 
     config::Config &config;
 
@@ -82,4 +91,8 @@ private:
     std::string term_emulator_version;
 
     ThemeManager theme_manager;
+
+    // notify
+    asio::experimental::channel<void(boost::system::error_code, std::string)>
+            notify_msg_channel;
 };

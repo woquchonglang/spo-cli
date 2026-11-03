@@ -15,10 +15,11 @@ import :cover;
 import :kittyImageComponent;
 import magic_enum;
 
-Ui::Ui(config::Config &config, SpotifyData &spotifyData)
+Ui::Ui(config::Config &config, SpotifyData &spotifyData, asio::io_context &ioc)
         : screen(App::FullscreenAlternateScreen())
         , config(config)
-        , spotifyData(spotifyData) {
+        , spotifyData(spotifyData)
+        , notify_msg_channel(ioc, 10) {
     quirks = Terminal::GetQuirks();
     term_emulator_name = screen.TerminalEmulatorName();
     term_emulator_version = screen.TerminalEmulatorVersion();
@@ -271,6 +272,13 @@ asio::awaitable<void> Ui::render() {
         return false;
     });
 
+    asio::co_spawn(
+            co_await asio::this_coro::executor,
+            [this]() -> asio::awaitable<void> {
+                co_await this->start_notify_get();
+            },
+            asio::detached);
+
     co_await renderLogin();
 
 
@@ -285,9 +293,10 @@ asio::awaitable<void> Ui::render() {
         auto [ec] =
                 co_await timer.async_wait(asio::as_tuple(asio::use_awaitable));
         if (ec)
-            co_return;
+            break;
     }
     Log::instance().info("ui render exit");
+    co_return;
 }
 
 void Ui::updateFrame() {
@@ -579,17 +588,12 @@ void Ui::render_image() {
 
 void Ui::render_notify() {
     notify_section = Renderer([&]() -> Element {
-        if (auto msg = config.notify_msg.read(); msg && !msg->empty()) {
-            notify_msg.push_back(*msg);
-        }
         if (!notify_msg.empty()) {
-            auto left_bar = separatorLight() | color(Color::Red);
-            auto content = text(notify_msg[0]) | flex;
-            auto element = hbox({
-                    left_bar,
-                    content,
-            });
-            return element;
+            Elements msgs;
+            for (auto msg : notify_msg) {
+                msgs.push_back(msg);
+            }
+            return vbox(std::move(msgs));
         }
         return emptyElement();
     });
@@ -657,3 +661,81 @@ void Ui::render_image_lyrics() {
 
 
 void Ui::reConfig() { render_proc(config.data.read()->proc.enable); }
+
+void Ui::send_notify_msg(const std::string &msg) {
+    if (!notify_msg_channel.try_send(boost::system::error_code{}, msg)) {
+        Log::instance().warn("notify channel full/closed, dropping message: {}",
+                             msg);
+    }
+}
+
+asio::awaitable<void> Ui::start_notify_get() {
+    asio::steady_timer timer(co_await asio::this_coro::executor);
+    while (main_show) {
+        auto [_ec, msg] = co_await notify_msg_channel.async_receive(
+                asio::as_tuple(asio::use_awaitable));
+
+        NotifyLevel level = NotifyLevel::Info;
+        std::string_view msg_view = msg;
+        if (msg_view.starts_with("Error:")) {
+            level = NotifyLevel::Error;
+            msg_view.remove_prefix(6);
+        } else if (msg_view.starts_with("Warning:")) {
+            level = NotifyLevel::Warning;
+            msg_view.remove_prefix(8);
+        } else if (msg_view.starts_with("Info:")) {
+            level = NotifyLevel::Info;
+            msg_view.remove_prefix(5);
+        }
+        while (!msg_view.empty() && msg_view.front() == ' ')
+            msg_view.remove_prefix(1);
+
+        Element left_bar;
+        int notify_sustain = 0;
+        switch (level) {
+        case NotifyLevel::Error: {
+            left_bar = separatorLight() | color(Color::Red);
+            notify_sustain = 6;
+            break;
+        }
+        case NotifyLevel::Info: {
+            left_bar = separatorLight() | color(Color::Chartreuse1);
+            notify_sustain = 3;
+            break;
+        }
+        case NotifyLevel::Warning: {
+            left_bar = separatorLight() | color(Color::Yellow);
+            notify_sustain = 5;
+            break;
+        }
+        }
+        auto content = text(std::string(msg_view)) | flex;
+        auto element = hbox({
+                left_bar,
+                content,
+        });
+        notify_msg.emplace_back(element);
+
+        asio::co_spawn(
+                co_await asio::this_coro::executor,
+                [this, notify_sustain]() -> asio::awaitable<void> {
+                    asio::steady_timer timer(
+                            co_await asio::this_coro::executor);
+                    timer.expires_after(std::chrono::seconds(notify_sustain));
+                    auto [ec] = co_await timer.async_wait(
+                            asio::as_tuple(asio::use_awaitable));
+                    if (!notify_msg.empty())
+                        notify_msg.pop_back();
+                    co_return;
+                },
+                asio::detached);
+
+        timer.expires_after(std::chrono::seconds(5));
+        auto [ec] =
+                co_await timer.async_wait(asio::as_tuple(asio::use_awaitable));
+        if (ec)
+            break;
+        if (!notify_msg.empty())
+            notify_msg.pop_back();
+    }
+}

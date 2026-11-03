@@ -37,7 +37,7 @@ int main() {
 
     SpotifyClient client(ioc, config, backend_thread);
 
-    Ui ui(config, client.data);
+    Ui ui(config, client.data, ioc);
     watcher.setOnChange([&config, &ui] {
         config.refresh();
         ui.screen.PostEvent(Event_ReConfig);
@@ -47,29 +47,29 @@ int main() {
             Proc::Info::instance().disable();
         }
     });
-    Log::instance().info("ui visualizer init");
+    asio::co_spawn(
+            ioc,
+            [&ioc, &ui]() -> asio::awaitable<void> {
+                Log::instance().info("ui init ");
+                co_await ui.render();
+            },
+            asio::detached);
+
+    config.register_ui_notify_msg_cb(
+            [&ui](std::string msg) { ui.send_notify_msg(msg); });
 
     AsyncEventHandler eventHandler(ioc, client, ui);
-
     eventHandler.scheduleExitHandler([&client] { client.librespot.stop(); });
     asio::co_spawn(
             ioc,
             [&ioc, &eventHandler]() -> asio::awaitable<void> {
+                Log::instance().info("eventHandler init");
                 co_await eventHandler.handle();
             },
             asio::detached);
-    Log::instance().info("eventHandler init");
-
-    asio::co_spawn(
-            ioc,
-            [&ioc, &ui]() -> asio::awaitable<void> { co_await ui.render(); },
-            asio::detached);
-    Log::instance().info("ui init ");
 
     eventHandler.scheduleExitHandler([&ioc] { ioc.stop(); });
     Log::instance().info("coroutine init ");
-
     ioc.run();
-
     backend_thread.join();
 }
