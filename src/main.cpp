@@ -11,8 +11,19 @@ import log;
 import proc;
 import spotify;
 import asio;
+import helper;
 
-int main() {
+int main(int argc, const char *argv[]) {
+    {
+        auto argvs = std::views::counted(std::next(argv), argc - 1) |
+                     std::ranges::to<std::vector<std::string_view>>();
+
+        Helper helper;
+        if (auto ex = helper.parse(argvs); !ex) {
+            return -1;
+        }
+    };
+
     asio::io_context ioc;
     asio::thread_pool backend_thread(4);
 
