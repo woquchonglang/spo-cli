@@ -12,6 +12,8 @@ import proc;
 import spotify;
 import asio;
 import helper;
+import plugin;
+import plugin;
 
 int main(int argc, const char *argv[]) {
     {
@@ -35,6 +37,15 @@ int main(int argc, const char *argv[]) {
             [&watcher]() -> asio::awaitable<void> {
                 Log::instance().info("config watcher init");
                 co_await watcher.watch_inotify();
+            },
+            asio::detached);
+
+    plugin::Manager plugin_manager(config.plugin_directory, ioc);
+    asio::co_spawn(
+            ioc,
+            [&plugin_manager]() -> asio::awaitable<void> {
+                Log::instance().info("plugin watcher init");
+                co_await plugin_manager.watch_inotify();
             },
             asio::detached);
 

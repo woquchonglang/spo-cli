@@ -36,6 +36,18 @@ Config::Config() {
     if (!fs::exists(cache_path)) {
         fs::create_directories(cache_path);
     }
+    // user direcotry
+    user_directory = fs::path(getenv("HOME")) / ".local" / "state" / "spo-cli";
+    if (!fs::exists(user_directory)) {
+        fs::create_directories(user_directory);
+    }
+    // plugin direcotry
+    plugin_directory = fs::path(getenv("HOME")) / ".local" / "state" /
+                       "spo-cli" / "plugins";
+    if (!fs::exists(plugin_directory)) {
+        fs::create_directories(plugin_directory);
+    }
+
     // current project test
     config_directory = fs::path(".config");
     config_path = config_directory / "spocli.toml";

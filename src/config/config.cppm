@@ -22,6 +22,8 @@ public:
 
     fs::path config_path;
     fs::path config_directory;
+    fs::path user_directory;
+    fs::path plugin_directory;
     fs::path cache_path;
 
     std::function<void(std::string)> ui_notify_msg_cb;
