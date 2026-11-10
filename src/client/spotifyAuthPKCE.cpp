@@ -5,10 +5,6 @@ module;
 #include <sys/socket.h>
 #include <openssl/sha.h>
 #include <openssl/evp.h>
-#include <boost/asio.hpp>
-#include <boost/asio/ssl.hpp>
-#include <boost/beast.hpp>
-#include <boost/beast/ssl.hpp>
 module spotify;
 
 import http.client;

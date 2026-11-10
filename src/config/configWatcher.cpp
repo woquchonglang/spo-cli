@@ -1,29 +1,27 @@
 module;
 #include <sys/inotify.h>
-#include <fcntl.h>
 #include <limits.h>
-#include <boost/asio/awaitable.hpp>
-#include <boost/asio/experimental/awaitable_operators.hpp>
 module config.watcher;
 
 import std;
+import std.compat;
 import log;
 
 using namespace config;
-using namespace boost::asio::experimental::awaitable_operators;
+using namespace asio::experimental::awaitable_operators;
 
 Watcher::Watcher(const std::string &path, asio::io_context &ioc)
         : inotify_fd(inotify_init1(IN_NONBLOCK | IN_CLOEXEC)), desc(ioc) {
     if (inotify_fd < 0) {
-        Log::instance().error("inotify_init1 failed: {}", std::strerror(errno));
+        // Log::instance().error("inotify_init1 failed: {}", std::strerror(errno));
         return;
     }
     desc.assign(inotify_fd);
     const uint32_t mask = IN_CLOSE_WRITE | IN_MOVED_TO;
     wd = inotify_add_watch(inotify_fd, path.c_str(), mask);
     if (wd < 0) {
-        Log::instance().error("inotify_add_watch failed for {}: {}", path,
-                              std::strerror(errno));
+        // Log::instance().error("inotify_add_watch failed for {}: {}", path,
+        //                       std::strerror(errno));
         return;
     }
 }

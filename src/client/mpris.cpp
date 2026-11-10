@@ -1,7 +1,7 @@
 module;
-#include <boost/asio/awaitable.hpp>
 module mpris;
 
+import std.compat;
 import event;
 import log;
 

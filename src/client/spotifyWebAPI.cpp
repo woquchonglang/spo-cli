@@ -1,9 +1,9 @@
 module;
 #include <sys/socket.h>
-#include <stdio.h>
 module spotify;
 
 import http.client;
+import std.compat;
 import log;
 
 namespace ssl = asio::ssl;

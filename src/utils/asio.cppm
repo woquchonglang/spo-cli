@@ -202,6 +202,11 @@ using boost::asio::posix::stream_descriptor;
 
 namespace experimental {
 using boost::asio::experimental::channel;
+
+namespace awaitable_operators {
+using boost::asio::experimental::awaitable_operators::operator||;
+}
+
 }
 
 namespace channel_errc {
@@ -213,4 +218,9 @@ using boost::asio::channel_errc::channel_cancelled;
 
 export namespace boost::system {
 using boost::system::error_code;
+}
+
+namespace std {
+export template <typename T, typename Executor, typename... Args>
+struct coroutine_traits<boost::asio::awaitable<T, Executor>, Args...>;
 }

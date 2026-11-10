@@ -1,11 +1,11 @@
 module;
-#include <stdlib.h>
 module config;
 
 import ftxui;
 import :defaults;
 import magic_enum;
 import log;
+import std.compat;
 
 using namespace config;
 using namespace std::literals; // for ""sv

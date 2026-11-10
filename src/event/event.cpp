@@ -1,11 +1,11 @@
 module;
-#include <boost/asio/awaitable.hpp>
 module event;
 
 import ftxui;
 import mpris;
 import magic_enum;
 import log;
+import ui;
 
 AsyncEventHandler::AsyncEventHandler(asio::io_context &ioc,
                                      SpotifyClient &client, Ui &ui)

@@ -1,7 +1,6 @@
 module;
 #include <openssl/err.h>
 #include <openssl/ssl.h>
-#include <boost/asio/awaitable.hpp>
 export module http.client;
 
 import std;

@@ -1,13 +1,11 @@
 module;
 #include <unistd.h>
-#include <boost/asio/experimental/awaitable_operators.hpp>
-#include <boost/asio/awaitable.hpp>
 module proc;
 
 import event;
 
 using namespace Proc;
-using namespace boost::asio::experimental::awaitable_operators;
+using namespace asio::experimental::awaitable_operators;
 
 CpuInfo::CpuInfo() : usage(0) {
     update_time();
