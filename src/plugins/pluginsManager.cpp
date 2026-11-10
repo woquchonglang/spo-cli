@@ -15,26 +15,66 @@ import log;
 using namespace plugin;
 using namespace boost::asio::experimental::awaitable_operators;
 
-Manager::Manager(const std::string &path, asio::io_context &ioc)
-        : inotify_fd(inotify_init1(IN_NONBLOCK | IN_CLOEXEC)), desc(ioc) {
+Manager::Manager(const fs::path &path, asio::io_context &ioc)
+        : inotify_fd(inotify_init1(IN_NONBLOCK | IN_CLOEXEC))
+        , desc(ioc)
+        , plugin_path(path) {
     if (inotify_fd < 0) {
         Log::instance().error("inotify_init1 failed: {}", std::strerror(errno));
         return;
     }
     desc.assign(inotify_fd);
-    const uint32_t mask = IN_CLOSE_WRITE | IN_MOVED_TO | IN_DELETE;
+    const uint32_t mask = IN_CLOSE_WRITE | IN_MOVED_TO | IN_DELETE |
+                          IN_MOVED_FROM;
     wd = inotify_add_watch(inotify_fd, path.c_str(), mask);
     if (wd < 0) {
         Log::instance().error("inotify_add_watch failed for {}: {}", path,
                               std::strerror(errno));
         return;
     }
+
+    std::error_code ec;
+    for (const auto &entry : fs::directory_iterator(path, ec)) {
+        if (ec)
+            break;
+        if (entry.is_regular_file()) {
+            auto name = entry.path().filename().string();
+            if (name.ends_with(".so")) {
+                load_plugin(name);
+            }
+        }
+    }
+
+    asio::co_spawn(
+            ioc,
+            [this]() -> asio::awaitable<void> {
+                Log::instance().info("plugin watcher init");
+                co_await watch_inotify();
+            },
+            asio::detached);
 }
 
+Manager::~Manager() {
+    if (inotify_rm_watch(inotify_fd, wd) < 0) {
+        Log::instance().error("inotify rm watch failed: {}",
+                              std::strerror(errno));
+    }
+}
+
+
 void Manager::load_plugin(std::string_view name) {
-    void *handle = dlopen(name.data(), RTLD_NOW);
+    for (auto _p : plugins) {
+        if (name == _p.lib_name) {
+            Log::instance().info("plugin repeatly load");
+            return;
+        }
+    }
+
+    fs::path full = fs::path(plugin_path) / name;
+    void *handle = dlopen(full.c_str(), RTLD_NOW);
     if (!handle) {
         std::string strerr = dlerror();
+        Log::instance().error("plugin load failed: {}", strerr);
         return;
     }
 
@@ -58,26 +98,28 @@ void Manager::load_plugin(std::string_view name) {
         Log::instance().error("plugin load failed: abi version not matching");
         return;
     }
-    CPlugin cplugin{ .iplugin = plugin, .handle = handle };
-    plugins.emplace_back(cplugin);
-    Log::instance().info("plugin load: success");
 
+    CPlugin cplugin{ .iplugin = plugin,
+                     .handle = handle,
+                     .lib_name = std::string(name) };
+    plugins.emplace_back(cplugin);
+    Log::instance().info("plugin:{} load success,version: {}", plugin->name,
+                         plugin->version);
+    cplugin.iplugin->init();
     return;
 }
 
 void Manager::unLoad_plugin(std::string_view name) {
     for (auto it = plugins.begin(); it != plugins.end();) {
-        if (!(*it).iplugin)
+        if ((*it).lib_name == name) {
+            if (!(*it).iplugin || !(*it).handle)
+                continue;
+            (*it).iplugin->shutdown();
+            void *_handle = (*it).handle;
+            it = plugins.erase(it);
+            dlclose(_handle);
+            Log::instance().info("plugin unload: success");
             return;
-
-        if ((*it).iplugin->name == name) {
-            if ((*it).handle) {
-                void *_handle = (*it).handle;
-                it = plugins.erase(it);
-                dlclose(_handle);
-                Log::instance().info("plugin unload: success");
-                return;
-            }
         } else {
             ++it;
         }
@@ -99,7 +141,7 @@ asio::awaitable<void> Manager::watch_inotify() {
             std::string name = ev->len ? ev->name : "";
             if (ev->mask & (IN_CLOSE_WRITE | IN_MOVED_TO)) {
                 load_plugin(name);
-            } else if (ev->mask & IN_DELETE) {
+            } else if (ev->mask & IN_DELETE | IN_MOVED_FROM) {
                 unLoad_plugin(name);
             }
         }

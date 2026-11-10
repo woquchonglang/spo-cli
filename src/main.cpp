@@ -41,13 +41,6 @@ int main(int argc, const char *argv[]) {
             asio::detached);
 
     plugin::Manager plugin_manager(config.plugin_directory, ioc);
-    asio::co_spawn(
-            ioc,
-            [&plugin_manager]() -> asio::awaitable<void> {
-                Log::instance().info("plugin watcher init");
-                co_await plugin_manager.watch_inotify();
-            },
-            asio::detached);
 
     asio::co_spawn(
             ioc,
