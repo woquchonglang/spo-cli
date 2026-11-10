@@ -1,0 +1,4 @@
+[submodule "lib/spo-cli"]
+	path = lib/spo-cli
+	url = https://github.com/woquchonglang/spo-cli.git
+  branch = test/plugin

@@ -1,0 +1,7 @@
+.clice
+.tup
+compile_commands.json
+build/*
+!build/tup.config
+
+

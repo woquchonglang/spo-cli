@@ -1,0 +1,9 @@
+CXXFLAGS += -std=c++26 -stdlib=libc++
+
+# std and stp.compat
+: /usr/share/libc++/v1/std.cppm |> ^j^ clang++ $(CXXFLAGS) -Wno-reserved-module-identifier --precompile %f -o %o |> std.pcm
+: /usr/share/libc++/v1/std.compat.cppm | std.pcm |> ^j^ clang++ $(CXXFLAGS) -Wno-reserved-module-identifier --precompile %f -fmodule-file=std=$(TUP_VARIANTDIR)/std.pcm -o %o |> std.compat.pcm
+
+: lib/spo-cli/src/plugins/pluginsAPI.cppm | std.pcm |> ^j^ clang++ $(CXXFLAGS) -fmodule-file=std=$(TUP_VARIANTDIR)/std.pcm --precompile %f -o %o |> pluginsAPI.pcm
+: plugin.cpp | pluginsAPI.pcm std.pcm |> ^j^ clang++ $(CXXFLAGS) -fPIC -fmodule-file=plugin.api=$(TUP_VARIANTDIR)/pluginsAPI.pcm -fmodule-file=std=$(TUP_VARIANTDIR)/std.pcm -c %f -o %o |> plugin.o
+: plugin.o |> clang++ -shared -o %o %f $(LDFLAGS) |> libplugin.so
